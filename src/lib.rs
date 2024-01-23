@@ -52,7 +52,7 @@ pub mod errors;
 
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, btree_map::Values},
     fmt::{Debug, Display},
     hash::Hash,
     ops::AddAssign,
@@ -191,11 +191,17 @@ pub trait AttributeCollection {
 
 
 
-struct AttributeMap {
-    attributes: HashMap<String, Box<dyn AttributeValue>>,
+struct AttributeMap<KeyType>
+where
+    KeyType: Hash,
+{
+    attributes: HashMap<KeyType, Box<dyn AttributeValue>>,
 }
 
-impl AttributeCollection for AttributeMap {
+impl<KeyType> AttributeCollection for AttributeMap<KeyType>
+where
+    KeyType: Hash,
+{
     fn new() -> Self {
         AttributeMap { attributes: HashMap::new() }
     }
@@ -226,6 +232,8 @@ where
     fn add_neighbour(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation);
     fn new() -> Self;
     fn count_neighbours(&self) -> usize;
+    fn count_neighbours_in(&self) -> usize;
+    fn count_neighbours_out(&self) -> usize;
 }
 
 
@@ -254,6 +262,16 @@ where
 
     #[inline]
     fn count_neighbours(&self) -> usize {
+        self.edges.len()
+    }
+
+    #[inline]
+    fn count_neighbours_in(&self) -> usize {
+        self.edges.len()
+    }
+
+    #[inline]
+    fn count_neighbours_out(&self) -> usize {
         self.edges.len()
     }
 }
@@ -293,6 +311,16 @@ where
     #[inline]
     fn v_degree(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
         self.unwrap().v_degree(id)
+    }
+
+    #[inline]
+    fn v_degree_in(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+        self.unwrap().v_degree_in(id)
+    }
+
+    #[inline]
+    fn v_degree_out(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+        self.unwrap().v_degree_out(id)
     }
 }
 
@@ -380,18 +408,57 @@ where
     /// 
     /// ## Details
     /// This function counts  _all_  vertices  of  the  underlying  [`Graph`]  that  are
-    /// directly connected to the vertex with ID `id` with _any_ possible edge.
+    /// directly connected to the vertex with ID `id` with _any_  possible  edge.  Thus,
+    /// `g.v_degree(id) == g.v_degree_in(id) + g.v_degree_out(id) + g.v_degree_undir(id)`.
     /// 
     /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
-    /// then                  `g.v_degree(id) == g.v_degree_in(id)`                  and
-    /// `g.v_degree(id) == g.v_degree_out(id)`.
-    /// 
-    /// If the underlying [`Graph`] `g` is  [directed](Graph#different-kinds-of-graphs),
-    /// then `g.v_degree(id) == g.v_degree_in(id) + g.v_degree_out(id)`.
+    /// then `g.v_degree(id) == g.v_degree_undir(id)`.
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// then each parallel edge will be counted separately.
     fn v_degree(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    /// # Vertex in-degree
+    /// 
+    /// ## Description
+    /// Get the number of vertices adjacent to the vertex with the  given  ID  that  are
+    /// connected with it by an incoming edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Return
+    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// 
+    /// ## Details
+    /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
+    /// then `g.v_degree_in(id) == 0`.
+    /// 
+    /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
+    /// then each parallel incoming edge will be counted separately.
+    fn v_degree_in(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    /// # Vertex out-degree
+    /// 
+    /// ## Description
+    /// Get the number of vertices adjacent to the vertex with the  given  ID  that  are
+    /// connected with it by an outcoming edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Return
+    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// 
+    /// ## Details
+    /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
+    /// then `g.v_degree_out(id) == 0`.
+    /// 
+    /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
+    /// then each parallel incoming edge will be counted separately.
+    fn v_degree_out(&self, id: &VertexIdType) -> NexusArtResult<usize>;
 }
 
 
@@ -527,6 +594,24 @@ where
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree";
         match self.edge_list.get(id) {
             Some(value) => Ok(value.count_neighbours()),
+            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+        }
+    }
+
+    #[inline]
+    fn v_degree_in(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_in";
+        match self.edge_list.get(id) {
+            Some(value) => Ok(value.count_neighbours_in()),
+            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+        }
+    }
+
+    #[inline]
+    fn v_degree_out(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_out";
+        match self.edge_list.get(id) {
+            Some(value) => Ok(value.count_neighbours_out()),
             None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
