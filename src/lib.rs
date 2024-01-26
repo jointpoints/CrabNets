@@ -52,7 +52,7 @@ pub mod errors;
 
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, HashSet, btree_map::Values},
+    collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
     ops::AddAssign,
@@ -66,39 +66,44 @@ use private::ConditionalType;
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * VERTEX ID                                                                         *
+// * ID                                                                                *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
-/// # Vertex ID trait
+/// # ID trait
 /// ## Description
-/// Types that implement `VertexId` can be used as unique identifiers of vertices within
-/// a graph. This trait is already implemented for  all  standard  integer  types  (both
-/// signed and unsigned).
+/// Types that implement `Id` can be used as unique identifiers of vertices and parallel
+/// edges within a [`Graph`]. This trait is already implemented for all standard integer
+/// types (both signed and unsigned).
 /// 
-/// Types that implement  `VertexId`  must  be  linearly  ordered,  hashable,  copyable,
-/// displayable.
-pub trait VertexId
+/// Types that implement `Id` must be linearly ordered, hashable, copyable, displayable.
+pub trait Id
 where
     Self: Copy + Display + Eq + Hash + Ord,
 {
-    /// # Default value of the vertex ID
+    /// # Default value of ID
+    /// 
     /// ## Description
-    /// This function returns the default value for the first vertex ID. For integers,
-    /// this function is implemented to return the minimum value of the respective
+    /// This function returns the default value for the first possible ID. For integers,
+    /// this function is implemented to return  the  minimum  value  of  the  respective
     /// integer type.
+    /// 
     /// ## Arguments
     /// None.
+    /// 
     /// ## Returns
-    /// `Self` - The default value for the first vertex ID.
+    /// `Self` - the default value for the first possible ID.
     fn default() -> Self;
     /// # Advance the element
+    /// 
     /// ## Description
-    /// This function assigns to the callee the following element in the linear order
+    /// This function assigns to the callee the following element in  the  linear  order
     /// defined for the type. For integers, this function increases the value by 1.
+    /// 
     /// ## Arguments
-    /// * `&mut self` - A mutable reference to the caller.
+    /// * `&mut self` - a mutable reference to the caller.
+    /// 
     /// ## Returns
     /// None.
     fn increment(&mut self);
@@ -106,7 +111,7 @@ where
 
 macro_rules! implement_vertex_id_trait_for {
     ($t: ty) => {
-        impl VertexId for $t {
+        impl Id for $t {
             fn default() -> Self {
                 <$t>::MIN
             }
@@ -209,46 +214,70 @@ where
 
 
 
+// ()::AttributeCollection
+impl AttributeCollection for () {
+    fn new() -> Self {
+        ()
+    }
+}
+
+
+
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * NEIGHBOURHOODS                                                                    *
+// * LOCALES                                                                           *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
 pub enum EdgeToVertexRelation {
     Undirected,
-    Ingoing,
-    Outgoing,
+    Incoming,
+    Outcoming,
 }
 
 
 
-pub trait Neighbourhood<VertexIdType>
+/// # Vertex together with its neighbours
+/// 
+/// ## Description
+/// This trait defines functions for **locales**. Locales are typically associated  with
+/// each vertex of a [`Graph`]. They capture local topology of the  network  by  storing
+/// all  vertices  adjacent  to  the  given  one  and,  furthermore,  they   store   all
+/// [attributes](Graph#attributes) of the given vertex and edges incident on it.
+/// 
+/// [Structural features](Graph#different-kinds-of-graphs) may differ  from  network  to
+/// network. Hence, it might make sense to use a locale with data  structures  optimised
+/// for the specific needs of your case.
+pub trait Locale<VertexIdType>
 where
-    VertexIdType: VertexId,
+    VertexIdType: Id,
 {
     fn add_neighbour(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation);
     fn new() -> Self;
     fn count_neighbours(&self) -> usize;
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
+    fn count_neighbours_undir(&self) -> usize;
 }
 
 
 
-struct UndirectedUnattributedSimpleNeighbourhood<VertexIdType>
+struct UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
 where
-    VertexIdType: VertexId,
+    VertexAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
 {
+    attributes: VertexAttributeCollectionType,
     edges: HashSet<VertexIdType>,
 }
 
-// UndirectedUnattributedSimpleNeighbourhood::Neighbourhood
-impl<VertexIdType> Neighbourhood<VertexIdType> for UndirectedUnattributedSimpleNeighbourhood<VertexIdType>
+// UndirectedSimpleUnattributedLocale::Locale
+impl<VertexAttributeCollectionType, VertexIdType> Locale<VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
 where
-    VertexIdType: VertexId,
+    VertexAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
 {
     #[inline]
     fn add_neighbour(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation) {
@@ -257,7 +286,7 @@ where
 
     #[inline]
     fn new() -> Self {
-        UndirectedUnattributedSimpleNeighbourhood { edges: HashSet::new() }
+        UndirectedSimpleUnattributedLocale { attributes: VertexAttributeCollectionType::new(), edges: HashSet::new() }
     }
 
     #[inline]
@@ -267,11 +296,16 @@ where
 
     #[inline]
     fn count_neighbours_in(&self) -> usize {
-        self.edges.len()
+        0
     }
 
     #[inline]
     fn count_neighbours_out(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn count_neighbours_undir(&self) -> usize {
         self.edges.len()
     }
 }
@@ -288,9 +322,9 @@ where
 
 pub trait ImmutableGraphContainer
 {
-    type NeighbourhoodType: Neighbourhood<Self::VertexIdType>;
-    type VertexIdType: VertexId;
-    fn unwrap(&self) -> &Graph<Self::NeighbourhoodType, Self::VertexIdType>;
+    type LocaleType: Locale<Self::VertexIdType>;
+    type VertexIdType: Id;
+    fn unwrap(&self) -> &Graph<Self::LocaleType, Self::VertexIdType>;
 }
 
 // <T:ImmutableGraphContainer>::BasicImmutableGraph
@@ -322,6 +356,11 @@ where
     fn v_degree_out(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
         self.unwrap().v_degree_out(id)
     }
+
+    #[inline]
+    fn v_degree_undir(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+        self.unwrap().v_degree_undir(id)
+    }
 }
 
 
@@ -330,7 +369,7 @@ pub trait MutableGraphContainer
 where
     Self: ImmutableGraphContainer,
 {
-    fn unwrap(&mut self) -> &mut Graph<Self::NeighbourhoodType, Self::VertexIdType>;
+    fn unwrap(&mut self) -> &mut Graph<Self::LocaleType, Self::VertexIdType>;
 }
 
 // <T:MutableGraphContainer>::BasicMutableGraph
@@ -339,7 +378,7 @@ where
     T: MutableGraphContainer,
 {
     #[inline]
-    fn add_e(&mut self, id1: T::VertexIdType, id2: T::VertexIdType, directed: bool) -> NexusArtResult<()> {
+    fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool) -> NexusArtResult<()> {
         self.unwrap().add_e(id1, id2, directed)
     }
 
@@ -360,6 +399,7 @@ where
 
 
 /// # Basic immutable functions for graphs
+/// 
 /// ## Description
 /// This trait defines functions and methods that give a user low-level access to  graph
 /// topology and _never_ change its structure (hence, immutable).
@@ -368,7 +408,7 @@ where
 /// [`ImmutableGraphContainer`].
 pub trait BasicImmutableGraph<VertexIdType>
 where
-    VertexIdType: VertexId,
+    VertexIdType: Id,
 {
     /// # Check existence of vertex
     /// 
@@ -457,8 +497,29 @@ where
     /// then `g.v_degree_out(id) == 0`.
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
-    /// then each parallel incoming edge will be counted separately.
+    /// then each parallel outcoming edge will be counted separately.
     fn v_degree_out(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    /// # Vertex undirected degree
+    /// 
+    /// ## Description
+    /// Get the number of vertices adjacent to the vertex with the  given  ID  that  are
+    /// connected with it by an undirected edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Return
+    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// 
+    /// ## Details
+    /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
+    /// then `g.v_degree_out(id) == g.v_degree(id)`.
+    /// 
+    /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
+    /// then each parallel undirected edge will be counted separately.
+    fn v_degree_undir(&self, id: &VertexIdType) -> NexusArtResult<usize>;
 }
 
 
@@ -473,7 +534,7 @@ where
 pub trait BasicMutableGraph<VertexIdType>
 where
     Self: BasicImmutableGraph<VertexIdType>,
-    VertexIdType: VertexId,
+    VertexIdType: Id,
 {
     /// # Add edge
     /// 
@@ -482,8 +543,10 @@ where
     /// 
     /// ## Arguments
     /// * `&mut self` - a mutable reference to the caller.
-    /// * `id1` : `VertexIdType` - the ID of the first vertex.
-    /// * `id2` : `VertexIdType` - the ID of the second vertex.
+    /// * `id1` : `&VertexIdType` - an immutable  reference  to  the  ID  of  the  first
+    /// vertex.
+    /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
+    /// vertex.
     /// * `directed` : `bool` - flag showing whether the edge should be directed or not.
     /// 
     /// ## Returns
@@ -502,7 +565,7 @@ where
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// existing edges between vertices `id1` and `id2` won't be affected.
-    fn add_e(&mut self, id1: VertexIdType, id2: VertexIdType, directed: bool) -> NexusArtResult<()>;
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool) -> NexusArtResult<()>;
     /// # Add vertex
     /// 
     /// ## Description
@@ -518,6 +581,7 @@ where
     /// ## Returns
     /// * `VertexIdType` - the ID of the new vertex.
     fn add_v(&mut self, id: Option<VertexIdType>) -> VertexIdType;
+    //fn delete_e(&mut self, &id1: VertexIdType, &id2: VertexIdType, edge_i: Option<>)
 }
 
 
@@ -553,20 +617,20 @@ where
 /// 
 /// ## Attributes
 /// Vertices and edges of graphs can store attributes.
-pub struct Graph<NeighbourhoodType, VertexIdType>
+pub struct Graph<LocaleType, VertexIdType>
 where
-    NeighbourhoodType: Neighbourhood<VertexIdType>,
-    VertexIdType: VertexId,
+    LocaleType: Locale<VertexIdType>,
+    VertexIdType: Id,
 {
-    edge_list: HashMap<VertexIdType, NeighbourhoodType>,
+    edge_list: HashMap<VertexIdType, LocaleType>,
     min_free_vertex_id: VertexIdType,
 }
 
 // Graph::Graph
-impl<NeighbourhoodType, VertexIdType> Graph<NeighbourhoodType, VertexIdType>
+impl<LocaleType, VertexIdType> Graph<LocaleType, VertexIdType>
 where
-    NeighbourhoodType: Neighbourhood<VertexIdType>,
-    VertexIdType: VertexId,
+    LocaleType: Locale<VertexIdType>,
+    VertexIdType: Id,
 {
     pub fn new() -> Self {
         Graph { edge_list: HashMap::new(), min_free_vertex_id: VertexIdType::default() }
@@ -574,10 +638,10 @@ where
 }
 
 // Graph::BasicImmutableGraph
-impl<NeighbourhoodType, VertexIdType> BasicImmutableGraph<VertexIdType> for Graph<NeighbourhoodType, VertexIdType>
+impl<LocaleType, VertexIdType> BasicImmutableGraph<VertexIdType> for Graph<LocaleType, VertexIdType>
 where
-    NeighbourhoodType: Neighbourhood<VertexIdType>,
-    VertexIdType: VertexId,
+    LocaleType: Locale<VertexIdType>,
+    VertexIdType: Id,
 {
     #[inline]
     fn contains_v(&self, id: &VertexIdType) -> bool {
@@ -615,20 +679,29 @@ where
             None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
+
+    #[inline]
+    fn v_degree_undir(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_undir";
+        match self.edge_list.get(id) {
+            Some(value) => Ok(value.count_neighbours_undir()),
+            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+        }
+    }
 }
 
 // Graph::BasicMutableGraph
-impl<NeighbourhoodType, VertexIdType> BasicMutableGraph<VertexIdType> for Graph<NeighbourhoodType, VertexIdType>
+impl<LocaleType, VertexIdType> BasicMutableGraph<VertexIdType> for Graph<LocaleType, VertexIdType>
 where
-    NeighbourhoodType: Neighbourhood<VertexIdType>,
-    VertexIdType: VertexId,
+    LocaleType: Locale<VertexIdType>,
+    VertexIdType: Id,
 {
-    fn add_e(&mut self, id1: VertexIdType, id2: VertexIdType, _directed: bool) -> NexusArtResult<()> {
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, _directed: bool) -> NexusArtResult<()> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::add_e";
-        if self.contains_v(&id1) {
-            if self.contains_v(&id2) {
-                self.edge_list.get_mut(&id1).unwrap().add_neighbour(id2, EdgeToVertexRelation::Undirected);
-                self.edge_list.get_mut(&id2).unwrap().add_neighbour(id1, EdgeToVertexRelation::Undirected);
+        if self.contains_v(id1) {
+            if self.contains_v(id2) {
+                self.edge_list.get_mut(id1).unwrap().add_neighbour(id2.clone(), EdgeToVertexRelation::Undirected);
+                self.edge_list.get_mut(id2).unwrap().add_neighbour(id1.clone(), EdgeToVertexRelation::Undirected);
                 Ok(())
             } else {
                 Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex {} doesn't exist.", id2)))
@@ -645,11 +718,11 @@ where
                 if self.edge_list.contains_key(&value) {
                     return value
                 }
-                self.edge_list.insert(value.clone(), NeighbourhoodType::new());
+                self.edge_list.insert(value.clone(), LocaleType::new());
                 return_value = value;
             },
             None => {
-                self.edge_list.insert(self.min_free_vertex_id.clone(), NeighbourhoodType::new());
+                self.edge_list.insert(self.min_free_vertex_id.clone(), LocaleType::new());
                 return_value = self.min_free_vertex_id.clone();
             },
         }
@@ -672,7 +745,6 @@ where
 
 #[derive(Clone, Copy)]
 pub enum GraphProperty{
-    NeighbourhoodType,
     VertexIdType,
 }
 
@@ -748,13 +820,12 @@ macro_rules! graph {
     (X ---X--- X with $($property:path = $value:ty),+) => {
         {
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            type NeighbourhoodType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::NeighbourhoodType, UndirectedUnattributedSimpleNeighbourhood<VertexIdType>);
-            Graph::<NeighbourhoodType, VertexIdType>::new()
+            Graph::<UndirectedSimpleUnattributedLocale<(), VertexIdType>, VertexIdType>::new()
         }
     };
 
     (X ---X--- X) => {
-        Graph::<UndirectedUnattributedSimpleNeighbourhood<usize>, usize>::new()
+        Graph::<UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
     };
 }
 
@@ -770,8 +841,7 @@ mod tests {
     fn non_standard_graph_new() {
         let mut g = graph!(X ---X--- X
             with
-            GraphProperty::VertexIdType = i8,
-            GraphProperty::NeighbourhoodType = UndirectedUnattributedSimpleNeighbourhood<i8>
+            GraphProperty::VertexIdType = i8
         );
         assert_eq!(g.add_v(None), -128);
     }
@@ -781,8 +851,8 @@ mod tests {
         let mut g = graph!(X ---X--- X);
         g.add_v(None);
         g.add_v(None);
-        assert!(g.add_e(0, 1, true).is_ok());
-        assert!(g.add_e(1, 2, false).is_err());
+        assert!(g.add_e(&0, &1, true).is_ok());
+        assert!(g.add_e(&1, &2, false).is_err());
     }
 
     #[test]
@@ -802,9 +872,9 @@ mod tests {
         g.add_v(None);
         g.add_v(None);
         g.add_v(None);
-        g.add_e(0, 1, false).unwrap();
-        g.add_e(0, 2, false).unwrap();
-        g.add_e(0, 3, false).unwrap();
+        g.add_e(&0, &1, false).unwrap();
+        g.add_e(&0, &2, false).unwrap();
+        g.add_e(&0, &3, false).unwrap();
         assert_eq!(g.v_degree(&0).unwrap(), 3);
         assert_eq!(g.v_degree(&2).unwrap(), 1);
     }
