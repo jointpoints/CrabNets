@@ -51,11 +51,7 @@ pub(self) mod private{
 pub mod errors;
 
 use std::{
-    any::{Any, TypeId},
-    collections::{HashMap, HashSet},
-    fmt::{Debug, Display},
-    hash::Hash,
-    ops::AddAssign,
+    any::{Any, TypeId}, collections::{HashMap, HashSet}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::AddAssign
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use errors::{NexusArtError, NexusArtResult};
@@ -250,11 +246,12 @@ pub enum EdgeToVertexRelation {
 /// [Structural features](Graph#different-kinds-of-graphs) may differ  from  network  to
 /// network. Hence, it might make sense to use a locale with data  structures  optimised
 /// for the specific needs of your case.
-pub trait Locale<VertexIdType>
+pub trait Locale<EdgeIdType, VertexIdType>
 where
+    EdgeIdType: Id,
     VertexIdType: Id,
 {
-    fn add_neighbour(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation);
+    fn add_neighbour(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
     fn new() -> Self;
     fn count_neighbours(&self) -> usize;
     fn count_neighbours_in(&self) -> usize;
@@ -274,14 +271,16 @@ where
 }
 
 // UndirectedSimpleUnattributedLocale::Locale
-impl<VertexAttributeCollectionType, VertexIdType> Locale<VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
+impl<EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeIdType, VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeIdType: Id,
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     #[inline]
-    fn add_neighbour(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation) {
+    fn add_neighbour(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>) -> EdgeIdType {
         self.edges.insert(id2);
+        EdgeIdType::default()
     }
 
     #[inline]
@@ -322,9 +321,10 @@ where
 
 pub trait ImmutableGraphContainer
 {
-    type LocaleType: Locale<Self::VertexIdType>;
+    type EdgeIdType: Id;
+    type LocaleType: Locale<Self::EdgeIdType, Self::VertexIdType>;
     type VertexIdType: Id;
-    fn unwrap(&self) -> &Graph<Self::LocaleType, Self::VertexIdType>;
+    fn unwrap(&self) -> &Graph<Self::EdgeIdType, Self::LocaleType, Self::VertexIdType>;
 }
 
 // <T:ImmutableGraphContainer>::BasicImmutableGraph
@@ -369,17 +369,17 @@ pub trait MutableGraphContainer
 where
     Self: ImmutableGraphContainer,
 {
-    fn unwrap(&mut self) -> &mut Graph<Self::LocaleType, Self::VertexIdType>;
+    fn unwrap(&mut self) -> &mut Graph<Self::EdgeIdType, Self::LocaleType, Self::VertexIdType>;
 }
 
 // <T:MutableGraphContainer>::BasicMutableGraph
-impl<T> BasicMutableGraph<T::VertexIdType> for T
+impl<T> BasicMutableGraph<T::EdgeIdType, T::VertexIdType> for T
 where
     T: MutableGraphContainer,
 {
     #[inline]
-    fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool) -> NexusArtResult<()> {
-        self.unwrap().add_e(id1, id2, directed)
+    fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool, edge_id: Option<T::EdgeIdType>) -> NexusArtResult<T::EdgeIdType> {
+        self.unwrap().add_e(id1, id2, directed, edge_id)
     }
 
     #[inline]
@@ -531,9 +531,10 @@ where
 /// 
 /// This  trait  is  implemented  for   [`Graph`]   and   any   type   that   implements
 /// [`MutableGraphContainer`].
-pub trait BasicMutableGraph<VertexIdType>
+pub trait BasicMutableGraph<EdgeIdType, VertexIdType>
 where
     Self: BasicImmutableGraph<VertexIdType>,
+    EdgeIdType: Id,
     VertexIdType: Id,
 {
     /// # Add edge
@@ -547,25 +548,41 @@ where
     /// vertex.
     /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
     /// vertex.
-    /// * `directed` : `bool` - flag showing whether the edge should be directed or not.
+    /// * `directed` : `bool` - if edge directions are supported (see [Details][details]),
+    /// this flag shows whether the edge should be directed or not.
+    /// * `edge_id`  :  `Option<EdgeIdType>`  -  if  edge   IDs   are   supported   (see
+    /// [Details][details]) and `Some(value)` is passed, a new edge with ID `value` will
+    /// be created; if `None` is passed,  the  ID  for  the  new  edge  will  be  chosen
+    /// automatically.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<()>`  -  `Ok(())`  is  returned  when  the  edge   was   added
-    /// successfully; `Err(NexusArtError)` is returned when at least one of the vertices
-    /// `id1` and `id2` doesn't exist.
+    /// * `NexusArtResult<EdgeIdType>` - `Ok(value)` is returned when the edge was added
+    /// successfully with `value` being the ID of the new edge; `Err(NexusArtError)`  is
+    /// returned when at least one of the vertices `id1` and `id2` doesn't exist.
     /// 
     /// ## Details
-    /// If the underlying  [`Graph`]  is  [undirected](Graph#different-kinds-of-graphs),
-    /// then the value of `directed` is ignored: the new edge will be undirected in  any
-    /// case.
+    /// If the underlying [`Graph`] is [undirected][kinds], then the value of `directed`
+    /// is ignored: undirected graphs don't support edge direction and the new edge will
+    /// be undirected in any case.
     /// 
-    /// If the underlying  [`Graph`]  is  [simple](Graph#different-kinds-of-graphs)  and
-    /// there's already an edge between vertices `id1`  and  `id2`,  then  the  existing
-    /// edge will be removed and replaced by the new one.
+    /// If the underlying [`Graph`] is  [simple][kinds]  and  there's  already  an  edge
+    /// between vertices `id1` and `id2`, then the existing edge  will  be  removed  and
+    /// replaced with the new one. This means that all properties of the  existing  edge
+    /// (e.g. [attributes][attrs]) will be lost. Furthermore,  the  value  of  `edge_id`
+    /// will be ignored as there're no parallel edges in simple graphs. If both vertices
+    /// `id1` and `id2` exist, the return value will always be `Ok(0)`.
     /// 
-    /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
-    /// existing edges between vertices `id1` and `id2` won't be affected.
-    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool) -> NexusArtResult<()>;
+    /// If the underlying [`Graph`] is a [multi-graph][kinds]  and  there's  already  an
+    /// edge between vertices `id1` and `id2` with ID `edge_id`, then the existing  edge
+    /// will be removed and replaced with the new one. This means that all properties of
+    /// the existing edge (e.g. [attributes][attrs]) will be lost. If  there's  no  edge
+    /// between `id1` and `id2` with ID `edge_id` or if `edge_id == None`, then the  new
+    /// parallel edge will be created without affecting the existing ones in any way.
+    /// 
+    /// [attrs]: Graph#attributes
+    /// [details]: #details
+    /// [kinds]: Graph#different-kinds-of-graphs
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> NexusArtResult<EdgeIdType>;
     /// # Add vertex
     /// 
     /// ## Description
@@ -574,12 +591,16 @@ where
     /// ## Arguments
     /// * `&mut self` - a mutable reference to the caller.
     /// * `id` : `Option<VertexIdType>` - if `Some(value)` is passed, a new vertex  with
-    /// ID `value` will be created, if a vertex with this  ID  already  exists,  nothing
-    /// will happen; if `None` is passed, the ID for  the  new  vertex  will  be  chosen
-    /// automatically.
+    /// ID `value` will be created; if `None` is passed, the ID for the new vertex  will
+    /// be chosen automatically.
     /// 
     /// ## Returns
     /// * `VertexIdType` - the ID of the new vertex.
+    /// 
+    /// ## Details
+    /// If there's already a vertex with ID `id`,  then  the  existing  vertex  will  be
+    /// removed and replaced with the new one. This means that  all  properties  of  the
+    /// existing vertex (e.g. [attributes][attrs], incident edges) will be lost.
     fn add_v(&mut self, id: Option<VertexIdType>) -> VertexIdType;
     //fn delete_e(&mut self, &id1: VertexIdType, &id2: VertexIdType, edge_i: Option<>)
 }
@@ -617,30 +638,34 @@ where
 /// 
 /// ## Attributes
 /// Vertices and edges of graphs can store attributes.
-pub struct Graph<LocaleType, VertexIdType>
+pub struct Graph<EdgeIdType, LocaleType, VertexIdType>
 where
-    LocaleType: Locale<VertexIdType>,
+    EdgeIdType: Id,
+    LocaleType: Locale<EdgeIdType, VertexIdType>,
     VertexIdType: Id,
 {
     edge_list: HashMap<VertexIdType, LocaleType>,
     min_free_vertex_id: VertexIdType,
+    phantom: PhantomData<EdgeIdType>,
 }
 
 // Graph::Graph
-impl<LocaleType, VertexIdType> Graph<LocaleType, VertexIdType>
+impl<EdgeIdType, LocaleType, VertexIdType> Graph<EdgeIdType, LocaleType, VertexIdType>
 where
-    LocaleType: Locale<VertexIdType>,
+    EdgeIdType: Id,
+    LocaleType: Locale<EdgeIdType, VertexIdType>,
     VertexIdType: Id,
 {
     pub fn new() -> Self {
-        Graph { edge_list: HashMap::new(), min_free_vertex_id: VertexIdType::default() }
+        Graph { edge_list: HashMap::new(), min_free_vertex_id: VertexIdType::default(), phantom: PhantomData }
     }
 }
 
 // Graph::BasicImmutableGraph
-impl<LocaleType, VertexIdType> BasicImmutableGraph<VertexIdType> for Graph<LocaleType, VertexIdType>
+impl<EdgeIdType, LocaleType, VertexIdType> BasicImmutableGraph<VertexIdType> for Graph<EdgeIdType, LocaleType, VertexIdType>
 where
-    LocaleType: Locale<VertexIdType>,
+    EdgeIdType: Id,
+    LocaleType: Locale<EdgeIdType, VertexIdType>,
     VertexIdType: Id,
 {
     #[inline]
@@ -691,18 +716,33 @@ where
 }
 
 // Graph::BasicMutableGraph
-impl<LocaleType, VertexIdType> BasicMutableGraph<VertexIdType> for Graph<LocaleType, VertexIdType>
+impl<EdgeIdType, LocaleType, VertexIdType> BasicMutableGraph<EdgeIdType, VertexIdType> for Graph<EdgeIdType, LocaleType, VertexIdType>
 where
-    LocaleType: Locale<VertexIdType>,
+    EdgeIdType: Id,
+    LocaleType: Locale<EdgeIdType, VertexIdType>,
     VertexIdType: Id,
 {
-    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, _directed: bool) -> NexusArtResult<()> {
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> NexusArtResult<EdgeIdType> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::add_e";
         if self.contains_v(id1) {
             if self.contains_v(id2) {
-                self.edge_list.get_mut(id1).unwrap().add_neighbour(id2.clone(), EdgeToVertexRelation::Undirected);
-                self.edge_list.get_mut(id2).unwrap().add_neighbour(id1.clone(), EdgeToVertexRelation::Undirected);
-                Ok(())
+                let actual_edge_id = self.edge_list
+                    .get_mut(id1)
+                    .unwrap()
+                    .add_neighbour(id2.clone(), if directed {
+                        EdgeToVertexRelation::Outcoming
+                    } else {
+                        EdgeToVertexRelation::Undirected
+                    }, edge_id);
+                self.edge_list
+                    .get_mut(id2)
+                    .unwrap()
+                    .add_neighbour(id1.clone(), if directed {
+                        EdgeToVertexRelation::Incoming
+                    } else {
+                        EdgeToVertexRelation::Undirected
+                    }, Some(actual_edge_id));
+                Ok(actual_edge_id)
             } else {
                 Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex {} doesn't exist.", id2)))
             }
@@ -715,9 +755,6 @@ where
         let return_value: VertexIdType;
         match id {
             Some(value) => {
-                if self.edge_list.contains_key(&value) {
-                    return value
-                }
                 self.edge_list.insert(value.clone(), LocaleType::new());
                 return_value = value;
             },
@@ -805,7 +842,7 @@ macro_rules! graph_type_recognition_assistant {
 /// argue that this notation is redundant and can be shortened by  getting  rid  of  the
 /// last token but we keep it for a better visual presentation.
 /// 
-/// As it's easy to guess now, the token in the middle symbolises edges of the network
+/// As it's easy to guess now, the token in the middle symbolises edges of  the  network
 /// and their properties.
 /// 
 /// Look closer at this second token and you'll notice that it looks like 2 arrows  with
@@ -820,12 +857,12 @@ macro_rules! graph {
     (X ---X--- X with $($property:path = $value:ty),+) => {
         {
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<UndirectedSimpleUnattributedLocale<(), VertexIdType>, VertexIdType>::new()
+            Graph::<u8, UndirectedSimpleUnattributedLocale<(), VertexIdType>, VertexIdType>::new()
         }
     };
 
     (X ---X--- X) => {
-        Graph::<UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
+        Graph::<u8, UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
     };
 }
 
@@ -851,8 +888,8 @@ mod tests {
         let mut g = graph!(X ---X--- X);
         g.add_v(None);
         g.add_v(None);
-        assert!(g.add_e(&0, &1, true).is_ok());
-        assert!(g.add_e(&1, &2, false).is_err());
+        assert!(g.add_e(&0, &1, true, None).is_ok());
+        assert!(g.add_e(&1, &2, false, None).is_err());
     }
 
     #[test]
@@ -872,9 +909,9 @@ mod tests {
         g.add_v(None);
         g.add_v(None);
         g.add_v(None);
-        g.add_e(&0, &1, false).unwrap();
-        g.add_e(&0, &2, false).unwrap();
-        g.add_e(&0, &3, false).unwrap();
+        g.add_e(&0, &1, false, None).unwrap();
+        g.add_e(&0, &2, false, None).unwrap();
+        g.add_e(&0, &3, false, None).unwrap();
         assert_eq!(g.v_degree(&0).unwrap(), 3);
         assert_eq!(g.v_degree(&2).unwrap(), 1);
     }
