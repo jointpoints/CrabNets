@@ -257,6 +257,7 @@ where
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
     fn count_neighbours_undir(&self) -> usize;
+    fn remove_neighbour(&mut self, id2: &VertexIdType, edge_id: EdgeIdType) -> bool;
 }
 
 
@@ -306,6 +307,11 @@ where
     #[inline]
     fn count_neighbours_undir(&self) -> usize {
         self.edges.len()
+    }
+
+    #[inline]
+    fn remove_neighbour(&mut self, id2: &VertexIdType, _edge_id: EdgeIdType) -> bool {
+        self.edges.remove(id2)
     }
 }
 
@@ -385,6 +391,11 @@ where
     #[inline]
     fn add_v(&mut self, id: Option<T::VertexIdType>) -> T::VertexIdType {
         self.unwrap().add_v(id)
+    }
+
+    #[inline]
+    fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: T::EdgeIdType) -> NexusArtResult<bool> {
+        self.unwrap().remove_e(id1, id2, edge_id)
     }
 }
 
@@ -558,7 +569,7 @@ where
     /// ## Returns
     /// * `NexusArtResult<EdgeIdType>` - `Ok(value)` is returned when the edge was added
     /// successfully with `value` being the ID of the new edge; `Err(NexusArtError)`  is
-    /// returned when at least one of the vertices `id1` and `id2` doesn't exist.
+    /// returned when at least 1 of the vertices `id1` and `id2` doesn't exist.
     /// 
     /// ## Details
     /// If the underlying [`Graph`] is [undirected][kinds], then the value of `directed`
@@ -601,8 +612,46 @@ where
     /// If there's already a vertex with ID `id`,  then  the  existing  vertex  will  be
     /// removed and replaced with the new one. This means that  all  properties  of  the
     /// existing vertex (e.g. [attributes][attrs], incident edges) will be lost.
+    /// 
+    /// [attrs]: Graph#attributes
     fn add_v(&mut self, id: Option<VertexIdType>) -> VertexIdType;
-    //fn delete_e(&mut self, &id1: VertexIdType, &id2: VertexIdType, edge_i: Option<>)
+    /// # Remove edge
+    /// 
+    /// ## Description
+    /// Delete an edge between 2 given vertices.
+    /// 
+    /// ## Arguments
+    /// * `&mut self` - a mutable reference to the caller.
+    /// * `id1` : `&VertexIdType` - an immutable  reference  to  the  ID  of  the  first
+    /// vertex.
+    /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
+    /// vertex.
+    /// * `edge_id` : `EdgeIdType` - if edge IDs are supported (see [Details]), then  an
+    /// edge between `id1` and `id2` with ID `edge_id` will be removed.
+    /// 
+    /// ## Returns
+    /// * `NexusArtResult<bool>` - `Ok(value)` is returned if the edge was  successfully
+    /// deleted or if it didn't exist: Boolean `value` shows whether  the  edge  existed
+    /// when this function was called; `Err(NexusArtError)` is returned when at leastv 1
+    /// of the vertices `id1` and `id2` doesn't exist.
+    /// 
+    /// <h6 id="remove-e-details">
+    ///     <a href="#remove-e-details">Details</a>
+    /// </h6>
+    /// 
+    /// If the underlying [`Graph`] is [undirected][kinds], the order of `id1` and `id2`
+    /// doesn't matter.
+    /// 
+    /// If the underlying  [`Graph`]  is  [directed][kinds],  this  function  will  only
+    /// attempt to delete an edge going from  `id1`  to  `id2`  or  an  undirected  edge
+    /// between `id1` and `id2`.
+    /// 
+    /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
+    /// ignored as simple graphs don't support edge IDs.
+    /// 
+    /// [Details]: #remove-e-details
+    /// [kinds]: Graph#different-kinds-of-graphs
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: EdgeIdType) -> NexusArtResult<bool>;
 }
 
 
@@ -744,10 +793,10 @@ where
                     }, Some(actual_edge_id));
                 Ok(actual_edge_id)
             } else {
-                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex {} doesn't exist.", id2)))
+                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
             }
         } else {
-            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex {} doesn't exist.", id1)))
+            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
     }
 
@@ -767,6 +816,20 @@ where
             self.min_free_vertex_id.increment();
         }
         return_value
+    }
+
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: EdgeIdType) -> NexusArtResult<bool> {
+        const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::delete_e";
+        if self.edge_list.contains_key(id1) {
+            if self.edge_list.contains_key(id2) {
+                self.edge_list.get_mut(id1).unwrap().remove_neighbour(id2, edge_id);
+                Ok(self.edge_list.get_mut(id2).unwrap().remove_neighbour(id1, edge_id))
+            } else {
+                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+            }
+        } else {
+            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+        }
     }
 }
 
@@ -884,35 +947,27 @@ mod tests {
     }
 
     #[test]
-    fn add_e() {
+    fn undirected_graph1() {
+        // Undirected simple unattributed graph
         let mut g = graph!(X ---X--- X);
-        g.add_v(None);
-        g.add_v(None);
-        assert!(g.add_e(&0, &1, true, None).is_ok());
-        assert!(g.add_e(&1, &2, false, None).is_err());
-    }
-
-    #[test]
-    fn add_v() {
-        let mut g = graph!(X ---X--- X);
-        assert_eq!(g.add_v(Some(1)), 1);
+        // Add vertices
         assert_eq!(g.add_v(None), 0);
-        assert_eq!(g.add_v(Some(218)), 218);
+        assert_eq!(g.add_v(Some(1)), 1);
         assert_eq!(g.add_v(None), 2);
-        return;
-    }
-
-    #[test]
-    fn v_degree() {
-        let mut g = graph!(X ---X--- X);
-        g.add_v(None);
-        g.add_v(None);
-        g.add_v(None);
-        g.add_v(None);
-        g.add_e(&0, &1, false, None).unwrap();
-        g.add_e(&0, &2, false, None).unwrap();
-        g.add_e(&0, &3, false, None).unwrap();
-        assert_eq!(g.v_degree(&0).unwrap(), 3);
-        assert_eq!(g.v_degree(&2).unwrap(), 1);
+        assert_eq!(g.add_v(Some(218)), 218);
+        // Add edges
+        assert!(g.add_e(&0, &1, false, None).is_ok());
+        assert!(g.add_e(&218, &2, true, Some(30)).is_ok_and(|x| x == 0));
+        assert!(g.add_e(&5, &6, false, None).is_err());
+        assert!(g.add_e(&0, &218, true, None).is_ok());
+        // Degrees
+        assert!(g.v_degree(&0).is_ok_and(|x| x == 2));
+        assert!(g.v_degree_out(&218).is_ok_and(|x| x == 0));
+        assert!(g.v_degree_undir(&218).is_ok_and(|x| x == 2));
+        assert!(g.v_degree_in(&5).is_err());
+        // Remove edges
+        assert!(g.remove_e(&2, &218, 0).is_ok_and(|x| x));
+        assert!(g.v_degree_undir(&218).is_ok_and(|x| x == 1));
+        assert!(g.v_degree(&2).is_ok_and(|x| x == 0));
     }
 }
