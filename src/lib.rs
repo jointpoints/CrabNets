@@ -51,7 +51,13 @@ pub(self) mod private{
 pub mod errors;
 
 use std::{
-    any::{Any, TypeId}, collections::{HashMap, HashSet}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::AddAssign
+    any::{Any, TypeId},
+    collections::{HashMap, HashSet, hash_set},
+    fmt::{Debug, Display},
+    hash::Hash,
+    iter::Cloned,
+    marker::PhantomData,
+    ops::AddAssign,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use errors::{NexusArtError, NexusArtResult};
@@ -73,10 +79,11 @@ use private::ConditionalType;
 /// edges within a [`Graph`]. This trait is already implemented for all standard integer
 /// types (both signed and unsigned).
 /// 
-/// Types that implement `Id` must be linearly ordered, hashable, copyable, displayable.
+/// Types  that  implement  `Id`  must  be  linearly   ordered,   hashable,   cloneable,
+/// displayable.
 pub trait Id
 where
-    Self: Copy + Display + Eq + Hash + Ord,
+    Self: Clone + Display + Eq + Hash + Ord,
 {
     /// # Default value of ID
     /// 
@@ -251,13 +258,21 @@ where
     EdgeIdType: Id,
     VertexIdType: Id,
 {
-    fn add_neighbour(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
-    fn new() -> Self;
+    type VertexIdIterator<'a>: Iterator<Item = VertexIdType>
+    where
+        Self: 'a;
+    fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
     fn count_neighbours(&self) -> usize;
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
     fn count_neighbours_undir(&self) -> usize;
-    fn remove_neighbour(&mut self, id2: &VertexIdType, edge_id: EdgeIdType) -> bool;
+    fn iter_neighbours<'a>(&'a self) -> Self::VertexIdIterator<'a>;
+    fn iter_neighbours_in<'a>(&'a self) -> Self::VertexIdIterator<'a>;
+    fn iter_neighbours_out<'a>(&'a self) -> Self::VertexIdIterator<'a>;
+    fn iter_neighbours_undir<'a>(&'a self) -> Self::VertexIdIterator<'a>;
+    fn new() -> Self;
+    fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
+    fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
 }
 
 
@@ -267,6 +282,7 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
+    always_empty_set: HashSet<VertexIdType>,
     attributes: VertexAttributeCollectionType,
     edges: HashSet<VertexIdType>,
 }
@@ -278,15 +294,14 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
-    #[inline]
-    fn add_neighbour(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>) -> EdgeIdType {
-        self.edges.insert(id2);
-        EdgeIdType::default()
-    }
+    type VertexIdIterator<'a> = Cloned<hash_set::Iter<'a, VertexIdType>>
+    where
+        Self: 'a;
 
     #[inline]
-    fn new() -> Self {
-        UndirectedSimpleUnattributedLocale { attributes: VertexAttributeCollectionType::new(), edges: HashSet::new() }
+    fn add_e(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>) -> EdgeIdType {
+        self.edges.insert(id2);
+        EdgeIdType::default()
     }
 
     #[inline]
@@ -310,7 +325,41 @@ where
     }
 
     #[inline]
-    fn remove_neighbour(&mut self, id2: &VertexIdType, _edge_id: EdgeIdType) -> bool {
+    fn iter_neighbours<'a>(&'a self) -> Self::VertexIdIterator<'a> {
+        self.edges.iter().cloned()
+    }
+
+    #[inline]
+    fn iter_neighbours_in<'a>(&'a self) -> Self::VertexIdIterator<'a> {
+        self.always_empty_set.iter().cloned()
+    }
+
+    #[inline]
+    fn iter_neighbours_out<'a>(&'a self) -> Self::VertexIdIterator<'a> {
+        self.always_empty_set.iter().cloned()
+    }
+
+    #[inline]
+    fn iter_neighbours_undir<'a>(&'a self) -> Self::VertexIdIterator<'a> {
+        self.edges.iter().cloned()
+    }
+
+    #[inline]
+    fn new() -> Self {
+        UndirectedSimpleUnattributedLocale{
+            always_empty_set: HashSet::new(),
+            attributes: VertexAttributeCollectionType::new(),
+            edges: HashSet::new(),
+        }
+    }
+
+    #[inline]
+    fn remove_e(&mut self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> bool {
+        self.edges.remove(id2)
+    }
+
+    #[inline]
+    fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool {
         self.edges.remove(id2)
     }
 }
@@ -394,8 +443,13 @@ where
     }
 
     #[inline]
-    fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: T::EdgeIdType) -> NexusArtResult<bool> {
+    fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> NexusArtResult<bool> {
         self.unwrap().remove_e(id1, id2, edge_id)
+    }
+
+    #[inline]
+    fn remove_v(&mut self, id: &T::VertexIdType) -> bool {
+        self.unwrap().remove_v(id)
     }
 }
 
@@ -635,9 +689,11 @@ where
     /// when this function was called; `Err(NexusArtError)` is returned when at leastv 1
     /// of the vertices `id1` and `id2` doesn't exist.
     /// 
-    /// <h6 id="remove-e-details">
-    ///     <a href="#remove-e-details">Details</a>
-    /// </h6>
+    /// <div id="remove-e-details" style="margin-top: -15px;">
+    /// 
+    /// ## Details
+    /// 
+    /// </div>
     /// 
     /// If the underlying [`Graph`] is [undirected][kinds], the order of `id1` and `id2`
     /// doesn't matter.
@@ -651,7 +707,8 @@ where
     /// 
     /// [Details]: #remove-e-details
     /// [kinds]: Graph#different-kinds-of-graphs
-    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: EdgeIdType) -> NexusArtResult<bool>;
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool>;
+    fn remove_v(&mut self, id: &VertexIdType) -> bool;
 }
 
 
@@ -778,7 +835,7 @@ where
                 let actual_edge_id = self.edge_list
                     .get_mut(id1)
                     .unwrap()
-                    .add_neighbour(id2.clone(), if directed {
+                    .add_e(id2.clone(), if directed {
                         EdgeToVertexRelation::Outcoming
                     } else {
                         EdgeToVertexRelation::Undirected
@@ -786,11 +843,11 @@ where
                 self.edge_list
                     .get_mut(id2)
                     .unwrap()
-                    .add_neighbour(id1.clone(), if directed {
+                    .add_e(id1.clone(), if directed {
                         EdgeToVertexRelation::Incoming
                     } else {
                         EdgeToVertexRelation::Undirected
-                    }, Some(actual_edge_id));
+                    }, Some(actual_edge_id.clone()));
                 Ok(actual_edge_id)
             } else {
                 Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
@@ -818,18 +875,28 @@ where
         return_value
     }
 
-    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: EdgeIdType) -> NexusArtResult<bool> {
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::delete_e";
         if self.edge_list.contains_key(id1) {
             if self.edge_list.contains_key(id2) {
-                self.edge_list.get_mut(id1).unwrap().remove_neighbour(id2, edge_id);
-                Ok(self.edge_list.get_mut(id2).unwrap().remove_neighbour(id1, edge_id))
+                self.edge_list.get_mut(id1).unwrap().remove_e(id2, edge_id);
+                Ok(self.edge_list.get_mut(id2).unwrap().remove_e(id1, edge_id))
             } else {
                 Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
             }
         } else {
             Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
+    }
+
+    fn remove_v(&mut self, id: &VertexIdType) -> bool {
+        if !self.edge_list.contains_key(id) {
+            return false;
+        }
+        for neighbour_id in self.edge_list[id].iter_neighbours() {
+            todo!();
+        }
+        true
     }
 }
 
@@ -966,8 +1033,8 @@ mod tests {
         assert!(g.v_degree_undir(&218).is_ok_and(|x| x == 2));
         assert!(g.v_degree_in(&5).is_err());
         // Remove edges
-        assert!(g.remove_e(&2, &218, 0).is_ok_and(|x| x));
-        assert!(g.v_degree_undir(&218).is_ok_and(|x| x == 1));
-        assert!(g.v_degree(&2).is_ok_and(|x| x == 0));
+        assert!(g.remove_e(&2, &218, &0).is_ok_and(|x| x));
+        assert!(g.v_degree(&218).is_ok_and(|x| x == 1));
+        assert!(g.v_degree_undir(&2).is_ok_and(|x| x == 0));
     }
 }
