@@ -45,17 +45,17 @@ pub(self) mod private{
         type Type = F;
     }
 
-    pub type ConditionalType<const C: bool, T: ?Sized, F: ?Sized> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
+    pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
 }
 
 pub mod errors;
 
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, HashSet, hash_set},
+    collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
-    iter::{Cloned, Map},
+    iter::empty,
     marker::PhantomData,
     ops::AddAssign,
 };
@@ -289,9 +289,6 @@ where
     EdgeIdType: Id,
     VertexIdType: Id,
 {
-    type VertexIterator<'a>: Iterator<Item = VertexIdType>
-    where
-        Self: 'a;
     fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
     fn count_neighbours(&self) -> usize;
     fn count_neighbours_in(&self) -> usize;
@@ -315,7 +312,6 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
-    always_empty_set: HashSet<VertexIdType>,
     attributes: VertexAttributeCollectionType,
     edges: HashSet<VertexIdType>,
 }
@@ -327,10 +323,6 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
-    type VertexIterator<'a> = Cloned<hash_set::Iter<'a, VertexIdType>>
-    where
-        Self: 'a;
-
     #[inline]
     fn add_e(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>) -> EdgeIdType {
         self.edges.insert(id2);
@@ -387,12 +379,12 @@ where
 
     #[inline]
     fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(self.always_empty_set.iter().cloned())
+        Box::new(empty::<VertexIdType>())
     }
 
     #[inline]
     fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(self.always_empty_set.iter().cloned())
+        Box::new(empty::<VertexIdType>())
     }
 
     #[inline]
@@ -403,7 +395,6 @@ where
     #[inline]
     fn new() -> Self {
         UndirectedSimpleUnattributedLocale{
-            always_empty_set: HashSet::new(),
             attributes: VertexAttributeCollectionType::new(),
             edges: HashSet::new(),
         }
