@@ -55,7 +55,7 @@ use std::{
     collections::{HashMap, HashSet, hash_set},
     fmt::{Debug, Display},
     hash::Hash,
-    iter::Cloned,
+    iter::{Cloned, Map},
     marker::PhantomData,
     ops::AddAssign,
 };
@@ -229,8 +229,17 @@ impl AttributeCollection for () {
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * LOCALES                                                                           *
+// * AUXILIARY ITEMS TO WORK WITH EDGES                                                *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+#[derive(Hash, PartialEq, Eq)]
+pub enum EdgeDirection {
+    Undirected,
+    Directed1to2,
+    Directed2to1,
+}
 
 
 
@@ -239,6 +248,28 @@ pub enum EdgeToVertexRelation {
     Incoming,
     Outcoming,
 }
+
+
+
+#[derive(Hash, PartialEq, Eq)]
+pub struct EdgeIteratorItem<EdgeIdType, VertexIdType>
+where
+    EdgeIdType: Id,
+    VertexIdType: Id,
+{
+    direction: EdgeDirection,
+    edge_id: EdgeIdType,
+    id1: VertexIdType,
+    id2: VertexIdType,
+}
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// * LOCALES                                                                           *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
@@ -258,7 +289,7 @@ where
     EdgeIdType: Id,
     VertexIdType: Id,
 {
-    type VertexIdIterator<'a>: Iterator<Item = VertexIdType>
+    type VertexIterator<'a>: Iterator<Item = VertexIdType>
     where
         Self: 'a;
     fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
@@ -266,10 +297,12 @@ where
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
     fn count_neighbours_undir(&self) -> usize;
-    fn iter_neighbours<'a>(&'a self) -> Self::VertexIdIterator<'a>;
-    fn iter_neighbours_in<'a>(&'a self) -> Self::VertexIdIterator<'a>;
-    fn iter_neighbours_out<'a>(&'a self) -> Self::VertexIdIterator<'a>;
-    fn iter_neighbours_undir<'a>(&'a self) -> Self::VertexIdIterator<'a>;
+    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
+    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn new() -> Self;
     fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
     fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
@@ -294,7 +327,7 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
-    type VertexIdIterator<'a> = Cloned<hash_set::Iter<'a, VertexIdType>>
+    type VertexIterator<'a> = Cloned<hash_set::Iter<'a, VertexIdType>>
     where
         Self: 'a;
 
@@ -324,24 +357,47 @@ where
         self.edges.len()
     }
 
-    #[inline]
-    fn iter_neighbours<'a>(&'a self) -> Self::VertexIdIterator<'a> {
-        self.edges.iter().cloned()
+    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+        let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
+        for id2 in self.edges.iter() {
+            answer.insert(EdgeIteratorItem {
+                direction: EdgeDirection::Undirected,
+                edge_id: EdgeIdType::default(),
+                id1: VertexIdType::default(),
+                id2: id2.clone(),
+            });
+        }
+        answer
     }
 
     #[inline]
-    fn iter_neighbours_in<'a>(&'a self) -> Self::VertexIdIterator<'a> {
-        self.always_empty_set.iter().cloned()
+    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
+        Box::new(self.edges.iter().map(|id2| EdgeIteratorItem {
+            direction: EdgeDirection::Undirected,
+            edge_id: EdgeIdType::default(),
+            id1: VertexIdType::default(),
+            id2: id2.clone(),
+        }))
     }
 
     #[inline]
-    fn iter_neighbours_out<'a>(&'a self) -> Self::VertexIdIterator<'a> {
-        self.always_empty_set.iter().cloned()
+    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges.iter().cloned())
     }
 
     #[inline]
-    fn iter_neighbours_undir<'a>(&'a self) -> Self::VertexIdIterator<'a> {
-        self.edges.iter().cloned()
+    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.always_empty_set.iter().cloned())
+    }
+
+    #[inline]
+    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.always_empty_set.iter().cloned())
+    }
+
+    #[inline]
+    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges.iter().cloned())
     }
 
     #[inline]
@@ -686,7 +742,7 @@ where
     /// ## Returns
     /// * `NexusArtResult<bool>` - `Ok(value)` is returned if the edge was  successfully
     /// deleted or if it didn't exist: Boolean `value` shows whether  the  edge  existed
-    /// when this function was called; `Err(NexusArtError)` is returned when at leastv 1
+    /// when this function was called; `Err(NexusArtError)` is returned when at least  1
     /// of the vertices `id1` and `id2` doesn't exist.
     /// 
     /// <div id="remove-e-details" style="margin-top: -15px;">
@@ -695,12 +751,8 @@ where
     /// 
     /// </div>
     /// 
-    /// If the underlying [`Graph`] is [undirected][kinds], the order of `id1` and `id2`
-    /// doesn't matter.
-    /// 
-    /// If the underlying  [`Graph`]  is  [directed][kinds],  this  function  will  only
-    /// attempt to delete an edge going from  `id1`  to  `id2`  or  an  undirected  edge
-    /// between `id1` and `id2`.
+    /// Even if the edge with ID `edge_id` is directed, the order of  values  `id1`  and
+    /// `id2` doesn't matter.
     /// 
     /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
     /// ignored as simple graphs don't support edge IDs.
@@ -708,6 +760,18 @@ where
     /// [Details]: #remove-e-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool>;
+    /// # Remove vertex
+    /// 
+    /// ## Description
+    /// Delete a vertex with the given ID.
+    /// 
+    /// ## Arguments
+    /// * `&mut self` - a mutable reference to the caller.
+    /// * `id` : `&VertexIdType` - the ID of a vertex to be removed.
+    /// 
+    /// ## Returns
+    /// * `bool` - shows whether the vertex with ID `id` existed when this function  was
+    /// called.
     fn remove_v(&mut self, id: &VertexIdType) -> bool;
 }
 
@@ -893,8 +957,12 @@ where
         if !self.edge_list.contains_key(id) {
             return false;
         }
-        for neighbour_id in self.edge_list[id].iter_neighbours() {
-            todo!();
+        for edge in self.edge_list[id].get_incident_es() {
+            self.remove_e(&edge.id1, &edge.id2, &edge.edge_id).unwrap();
+        }
+        self.edge_list.remove(id);
+        if self.min_free_vertex_id > *id {
+            self.min_free_vertex_id = id.clone();
         }
         true
     }
@@ -1036,5 +1104,18 @@ mod tests {
         assert!(g.remove_e(&2, &218, &0).is_ok_and(|x| x));
         assert!(g.v_degree(&218).is_ok_and(|x| x == 1));
         assert!(g.v_degree_undir(&2).is_ok_and(|x| x == 0));
+        // Add new edges
+        assert!(g.add_e(&0, &2, false, None).is_ok());
+        assert!(g.add_e(&218, &2, true, None).is_ok_and(|x| x == 0));
+        // Remove vertex
+        assert!(g.remove_v(&0));
+        assert!(g.v_degree(&0).is_err());
+        assert!(g.v_degree(&1).is_ok_and(|x| x == 0));
+        assert!(g.v_degree(&2).is_ok_and(|x| x == 1));
+        assert!(g.v_degree(&218).is_ok_and(|x| x == 1));
+        // Add new vertices
+        assert_eq!(g.add_v(None), 0);
+        assert_eq!(g.add_v(None), 3);
+        assert_eq!(g.count_v(), 5);
     }
 }
