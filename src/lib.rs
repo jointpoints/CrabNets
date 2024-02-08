@@ -49,6 +49,7 @@ pub(self) mod private{
 }
 
 pub mod errors;
+pub(crate) mod locales;
 
 use std::{
     any::{Any, TypeId},
@@ -61,6 +62,7 @@ use std::{
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use errors::{NexusArtError, NexusArtResult};
+use locales::*;
 use private::ConditionalType;
 
 
@@ -268,154 +270,6 @@ where
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * LOCALES                                                                           *
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-
-
-/// # Vertex together with its neighbours
-/// 
-/// ## Description
-/// This trait defines functions for **locales**. Locales are typically associated  with
-/// each vertex of a [`Graph`]. They capture local topology of the  network  by  storing
-/// all  vertices  adjacent  to  the  given  one  and,  furthermore,  they   store   all
-/// [attributes](Graph#attributes) of the given vertex and edges incident on it.
-/// 
-/// [Structural features](Graph#different-kinds-of-graphs) may differ  from  network  to
-/// network. Hence, it might make sense to use a locale with data  structures  optimised
-/// for the specific needs of your case.
-pub trait Locale<EdgeIdType, VertexIdType>
-where
-    EdgeIdType: Id,
-    VertexIdType: Id,
-{
-    fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
-    fn count_neighbours(&self) -> usize;
-    fn count_neighbours_in(&self) -> usize;
-    fn count_neighbours_out(&self) -> usize;
-    fn count_neighbours_undir(&self) -> usize;
-    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
-    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    fn new() -> Self;
-    fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
-    fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
-}
-
-
-
-struct UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
-where
-    VertexAttributeCollectionType: AttributeCollection,
-    VertexIdType: Id,
-{
-    attributes: VertexAttributeCollectionType,
-    edges: HashSet<VertexIdType>,
-}
-
-// UndirectedSimpleUnattributedLocale::Locale
-impl<EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeIdType, VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
-where
-    EdgeIdType: Id,
-    VertexAttributeCollectionType: AttributeCollection,
-    VertexIdType: Id,
-{
-    #[inline]
-    fn add_e(&mut self, id2: VertexIdType, _relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>) -> EdgeIdType {
-        self.edges.insert(id2);
-        EdgeIdType::default()
-    }
-
-    #[inline]
-    fn count_neighbours(&self) -> usize {
-        self.edges.len()
-    }
-
-    #[inline]
-    fn count_neighbours_in(&self) -> usize {
-        0
-    }
-
-    #[inline]
-    fn count_neighbours_out(&self) -> usize {
-        0
-    }
-
-    #[inline]
-    fn count_neighbours_undir(&self) -> usize {
-        self.edges.len()
-    }
-
-    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
-        let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
-        for id2 in self.edges.iter() {
-            answer.insert(EdgeIteratorItem {
-                direction: EdgeDirection::Undirected,
-                edge_id: EdgeIdType::default(),
-                id1: VertexIdType::default(),
-                id2: id2.clone(),
-            });
-        }
-        answer
-    }
-
-    #[inline]
-    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
-        Box::new(self.edges.iter().map(|id2| EdgeIteratorItem {
-            direction: EdgeDirection::Undirected,
-            edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
-            id2: id2.clone(),
-        }))
-    }
-
-    #[inline]
-    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(self.edges.iter().cloned())
-    }
-
-    #[inline]
-    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(empty::<VertexIdType>())
-    }
-
-    #[inline]
-    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(empty::<VertexIdType>())
-    }
-
-    #[inline]
-    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(self.edges.iter().cloned())
-    }
-
-    #[inline]
-    fn new() -> Self {
-        UndirectedSimpleUnattributedLocale{
-            attributes: VertexAttributeCollectionType::new(),
-            edges: HashSet::new(),
-        }
-    }
-
-    #[inline]
-    fn remove_e(&mut self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> bool {
-        self.edges.remove(id2)
-    }
-
-    #[inline]
-    fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool {
-        self.edges.remove(id2)
-    }
-}
-
-
-
-
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 // * GRAPH CONTAINERS                                                                  *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
@@ -437,6 +291,11 @@ where
     #[inline]
     fn contains_v(&self, id: &T::VertexIdType) -> bool {
         self.unwrap().contains_v(id)
+    }
+
+    #[inline]
+    fn count_e(&self) -> usize {
+        self.unwrap().count_e()
     }
 
     #[inline]
@@ -534,6 +393,17 @@ where
     /// ## Returns
     /// * `bool` - `true` if such vertex exists, `false` otherwise.
     fn contains_v(&self, id: &VertexIdType) -> bool;
+    /// # Count edges
+    /// 
+    /// ## Description
+    /// Get the number of edges in the graph.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `usize` - the number of edges in the graph.
+    fn count_e(&self) -> usize;
     /// # Count vertices
     /// 
     /// ## Description
@@ -839,6 +709,14 @@ where
         self.edge_list.len()
     }
 
+    fn count_e(&self) -> usize {
+        let mut answer: usize = 0;
+        for (_, locale) in self.edge_list.iter() {
+            answer += locale.count_neighbours();
+        }
+        answer / 2
+    }
+
     #[inline]
     fn v_degree(&self, id: &VertexIdType) -> NexusArtResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree";
@@ -971,6 +849,8 @@ where
 
 #[derive(Clone, Copy)]
 pub enum GraphProperty{
+    EdgeIdType,
+    VertexAttributeCollectionType,
     VertexIdType,
 }
 
@@ -1053,6 +933,18 @@ macro_rules! graph {
     (X ---X--- X) => {
         Graph::<u8, UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
     };
+
+    (A ---X--- A with $($property:path = $value:ty),+) => {
+        {
+            type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, AttributeMap<String>);
+            type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
+            Graph::<u8, UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>, VertexIdType>::new()
+        }
+    };
+
+    (A ---X--- A) => {
+        Graph::<u8, UndirectedSimpleUnattributedLocale<AttributeMap<String>, usize>, usize>::new()
+    };
 }
 
 
@@ -1064,10 +956,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn non_standard_graph_new() {
+    fn graph_new_xxx_with() {
         let mut g = graph!(X ---X--- X
-            with
+        with
             GraphProperty::VertexIdType = i8
+        );
+        assert_eq!(g.add_v(None), -128);
+    }
+
+    #[test]
+    fn graph_new_axa() {
+        let mut g = graph!(A ---X--- A);
+        assert_eq!(g.add_v(None), 0);
+    }
+
+    #[test]
+    fn graph_new_axa_with() {
+        let mut g = graph!(A ---X--- A
+        with
+            GraphProperty::VertexIdType = i8,
+            GraphProperty::VertexAttributeCollectionType = ()
         );
         assert_eq!(g.add_v(None), -128);
     }
@@ -1108,5 +1016,6 @@ mod tests {
         assert_eq!(g.add_v(None), 0);
         assert_eq!(g.add_v(None), 3);
         assert_eq!(g.count_v(), 5);
+        assert_eq!(g.count_e(), 1);
     }
 }
