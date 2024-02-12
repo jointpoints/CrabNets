@@ -3,11 +3,18 @@
 //! <div style="text-align: center"><b><i>Fast and flexible graph library for Rust</i></b></div>
 //! 
 //! ## Welcome!
-//! NexusArt is one of the few Rust libraries that enable developers to build,  analyse,
-//! manipulate and visualise graphs/networks.
+//! NexusArt is one of the few Rust libraries that enable developers to  build,  analyse
+//! and manipulate graphs/networks.
 //! 
 //! ## Features
-//! * 123456789
+//! * **Different families of graphs with unified interface**  Build  simple  graphs  or
+//! multi-graphs with directed or undirected edges and maniputate all of them  with  the
+//! same set of functions! [More about this...][kinds]
+//! * **Attributes** Add your custom attributes to vertices or edges  or  even  both  of
+//! them! [More about this...][attrs]
+//! 
+//! [kinds]: Graph#different-kinds-of-graphs
+//! [attrs]: Graph#attributes
 
 
 
@@ -49,7 +56,7 @@ pub(self) mod private{
 }
 
 pub mod errors;
-pub(crate) mod locales;
+pub mod locales;
 
 use std::{
     any::{Any, TypeId},
@@ -826,7 +833,7 @@ where
         if !self.edge_list.contains_key(id) {
             return false;
         }
-        for edge in self.edge_list[id].get_incident_es() {
+        for edge in self.edge_list[id].get_incident_e() {
             self.remove_e(&edge.id1, &edge.id2, &edge.edge_id).unwrap();
         }
         self.edge_list.remove(id);

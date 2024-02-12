@@ -9,13 +9,17 @@ use crate::{AttributeCollection, EdgeDirection, EdgeIteratorItem, EdgeToVertexRe
 /// 
 /// ## Description
 /// This trait defines functions for **locales**. Locales are typically associated  with
-/// each vertex of a [`Graph`]. They capture local topology of the  network  by  storing
-/// all  vertices  adjacent  to  the  given  one  and,  furthermore,  they   store   all
-/// [attributes](Graph#attributes) of the given vertex and edges incident on it.
+/// each vertex of a [`Graph`][graph]. They capture local topology  of  the  network  by
+/// storing all vertices adjacent to the given one  and,  furthermore,  they  store  all
+/// [attributes][attrs] of the given vertex and edges incident on it.
 /// 
-/// [Structural features](Graph#different-kinds-of-graphs) may differ  from  network  to
-/// network. Hence, it might make sense to use a locale with data  structures  optimised
-/// for the specific needs of your case.
+/// [Structural features][kinds] may differ from network to  network.  Hence,  it  might
+/// make sense to use a locale with data structures optimised for the specific needs  of
+/// your case.
+/// 
+/// [graph]: crate::Graph
+/// [attrs]: crate::Graph#attributes
+/// [kinds]: crate::Graph#different-kinds-of-graphs
 pub trait Locale<EdgeIdType, VertexIdType>
 where
     EdgeIdType: Id,
@@ -26,11 +30,11 @@ where
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
     fn count_neighbours_undir(&self) -> usize;
-    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_es_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_es_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_es_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
+    fn get_incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn get_incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn get_incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn get_incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
     fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
@@ -84,7 +88,7 @@ where
         self.edges.len()
     }
 
-    fn get_incident_es<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn get_incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
         for id2 in self.edges.iter() {
             answer.insert(EdgeIteratorItem {
@@ -98,16 +102,16 @@ where
     }
 
     #[inline]
-    fn get_incident_es_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn get_incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         HashSet::new()
     }
 
     #[inline]
-    fn get_incident_es_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn get_incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         HashSet::new()
     }
 
-    fn get_incident_es_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn get_incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
         for id2 in self.edges.iter() {
             answer.insert(EdgeIteratorItem {
@@ -121,7 +125,7 @@ where
     }
 
     #[inline]
-    fn iter_incident_es<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
+    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
         Box::new(self.edges.iter().map(|id2| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
