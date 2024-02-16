@@ -22,6 +22,7 @@ use crate::{AttributeCollection, EdgeDirection, EdgeIteratorItem, EdgeToVertexRe
 /// [kinds]: crate::Graph#different-kinds-of-graphs
 pub trait Locale<EdgeIdType, VertexIdType>
 where
+    Self: Clone,
     EdgeIdType: Id,
     VertexIdType: Id,
 {
@@ -46,6 +47,7 @@ where
 
 
 
+#[derive(Clone)]
 pub struct UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
 where
     VertexAttributeCollectionType: AttributeCollection,

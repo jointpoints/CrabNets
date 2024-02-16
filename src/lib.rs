@@ -52,24 +52,26 @@ pub(self) mod private{
         type Type = F;
     }
 
+    #[allow(dead_code)]
     pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
 }
 
 pub mod errors;
+pub mod io;
 pub mod locales;
 
 use std::{
     any::{Any, TypeId},
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
-    iter::empty,
     marker::PhantomData,
     ops::AddAssign,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use errors::{NexusArtError, NexusArtResult};
 use locales::*;
+#[allow(unused_imports)]
 use private::ConditionalType;
 
 
@@ -202,22 +204,26 @@ clone_trait_object!(AttributeValue);
 
 
 
-pub trait AttributeCollection {
+pub trait AttributeCollection
+where
+    Self: Clone,
+{
     fn new() -> Self;
 }
 
 
 
+#[derive(Clone)]
 struct AttributeMap<KeyType>
 where
-    KeyType: Hash,
+    KeyType: Clone + Eq + Hash,
 {
     attributes: HashMap<KeyType, Box<dyn AttributeValue>>,
 }
 
 impl<KeyType> AttributeCollection for AttributeMap<KeyType>
 where
-    KeyType: Hash,
+    KeyType: Clone + Eq + Hash,
 {
     fn new() -> Self {
         AttributeMap { attributes: HashMap::new() }
@@ -283,6 +289,8 @@ where
 
 
 pub trait ImmutableGraphContainer
+where
+    Self: Clone,
 {
     type EdgeIdType: Id;
     type LocaleType: Locale<Self::EdgeIdType, Self::VertexIdType>;
@@ -293,7 +301,7 @@ pub trait ImmutableGraphContainer
 // <T:ImmutableGraphContainer>::BasicImmutableGraph
 impl<T> BasicImmutableGraph<T::VertexIdType> for T
 where
-    T: ImmutableGraphContainer,
+    T: Clone + ImmutableGraphContainer,
 {
     #[inline]
     fn contains_v(&self, id: &T::VertexIdType) -> bool {
@@ -343,7 +351,7 @@ where
 // <T:MutableGraphContainer>::BasicMutableGraph
 impl<T> BasicMutableGraph<T::EdgeIdType, T::VertexIdType> for T
 where
-    T: MutableGraphContainer,
+    T: Clone + MutableGraphContainer,
 {
     #[inline]
     fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool, edge_id: Option<T::EdgeIdType>) -> NexusArtResult<T::EdgeIdType> {
@@ -386,6 +394,7 @@ where
 /// [`ImmutableGraphContainer`].
 pub trait BasicImmutableGraph<VertexIdType>
 where
+    Self: Clone,
     VertexIdType: Id,
 {
     /// # Check existence of vertex
@@ -676,6 +685,7 @@ where
 /// 
 /// ## Attributes
 /// Vertices and edges of graphs can store attributes.
+#[derive(Clone)]
 pub struct Graph<EdgeIdType, LocaleType, VertexIdType>
 where
     EdgeIdType: Id,
@@ -863,6 +873,7 @@ pub enum GraphProperty{
 
 
 
+#[allow(unused_macros)]
 macro_rules! graph_type_recognition_assistant {
     ([$first_property:path = $first_value:ty, $($property:path = $value:ty),+], $required_property:path, $default_value:ty) => {
         ConditionalType<
