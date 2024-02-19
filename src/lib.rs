@@ -56,6 +56,7 @@ pub(self) mod private{
     pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
 }
 
+pub mod attribute;
 pub mod errors;
 pub mod io;
 pub mod locales;
@@ -68,6 +69,7 @@ use std::{
     marker::PhantomData,
     ops::AddAssign,
 };
+use attribute::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use dyn_clone::{clone_trait_object, DynClone};
 use errors::{NexusArtError, NexusArtResult};
 use locales::*;
@@ -149,95 +151,6 @@ implement_vertex_id_trait_for!(i32);
 implement_vertex_id_trait_for!(i64);
 implement_vertex_id_trait_for!(i128);
 implement_vertex_id_trait_for!(isize);
-
-
-
-
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * ATTRIBUTES                                                                        *
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-
-
-/// # Dynamic attribute value trait
-pub trait AttributeValue
-where
-    Self: Any + Debug + DynClone + Send + Sync,
-{}
-
-impl<AttributeValueType> AttributeValue for AttributeValueType
-where
-    AttributeValueType: Any + Debug + Clone + Send + Sync,
-{}
-
-impl dyn AttributeValue {
-    #[inline]
-    pub fn is<T: Any>(&self) -> bool {
-        TypeId::of::<T>() == self.type_id()
-    }
-
-    pub fn downcast<T: Any>(&self) -> Option<&T> {
-        if !self.is::<T>() {
-            return None;
-        }
-        unsafe { Some(&*(self as *const dyn AttributeValue as *const T)) }
-    }
-
-    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
-        if !self.is::<T>() {
-            return None;
-        }
-        unsafe { Some(&mut *(self as *mut dyn AttributeValue as *mut T)) }
-    }
-}
-
-clone_trait_object!(AttributeValue);
-
-
-
-
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * ATTRIBUTE COLLECTIONS                                                             *
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-
-
-pub trait AttributeCollection
-where
-    Self: Clone,
-{
-    fn new() -> Self;
-}
-
-
-
-#[derive(Clone)]
-struct AttributeMap<KeyType>
-where
-    KeyType: Clone + Eq + Hash,
-{
-    attributes: HashMap<KeyType, Box<dyn AttributeValue>>,
-}
-
-impl<KeyType> AttributeCollection for AttributeMap<KeyType>
-where
-    KeyType: Clone + Eq + Hash,
-{
-    fn new() -> Self {
-        AttributeMap { attributes: HashMap::new() }
-    }
-}
-
-
-
-// ()::AttributeCollection
-impl AttributeCollection for () {
-    fn new() -> Self {
-        ()
-    }
-}
 
 
 
@@ -952,16 +865,16 @@ macro_rules! graph {
         Graph::<u8, UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
     };
 
-    (A ---X--- A with $($property:path = $value:ty),+) => {
+    (D ---X--- D with $($property:path = $value:ty),+) => {
         {
-            type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, AttributeMap<String>);
+            type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>);
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
             Graph::<u8, UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>, VertexIdType>::new()
         }
     };
 
-    (A ---X--- A) => {
-        Graph::<u8, UndirectedSimpleUnattributedLocale<AttributeMap<String>, usize>, usize>::new()
+    (D ---X--- D) => {
+        Graph::<u8, UndirectedSimpleUnattributedLocale<DynamicDispatchAttributeMap<String>, usize>, usize>::new()
     };
 }
 
@@ -984,13 +897,13 @@ mod tests {
 
     #[test]
     fn graph_new_axa() {
-        let mut g = graph!(A ---X--- A);
+        let mut g = graph!(D ---X--- D);
         assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn graph_new_axa_with() {
-        let mut g = graph!(A ---X--- A
+        let mut g = graph!(D ---X--- D
         with
             GraphProperty::VertexIdType = i8,
             GraphProperty::VertexAttributeCollectionType = ()

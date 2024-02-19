@@ -22,7 +22,13 @@ mod gnbs;
 
 use std::{fs::File, hash::Hash};
 use crate::{
-    errors::{NexusArtError, NexusArtResult}, AttributeCollection, AttributeMap, AttributeValue, BasicMutableGraph, EdgeDirection, Graph, Id, Locale, MutableGraphContainer
+    attribute::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue},
+    errors::{NexusArtError, NexusArtResult},
+    DynamicDispatchAttributeMap,
+    BasicMutableGraph,
+    Graph,
+    Id,
+    Locale,
 };
 use gnbs::GNBSReader;
 
@@ -36,21 +42,10 @@ use gnbs::GNBSReader;
 
 
 
-pub enum AttributeTokenOwner<EdgeIdType, VertexIdType>
-where
-    EdgeIdType: Id,
-    VertexIdType: Id,
-{
-    Vertex { id: VertexIdType },
-    Edge { id1: VertexIdType, id2: VertexIdType, direction: EdgeDirection, edge_i: EdgeIdType },
-}
-
-
-
 pub struct AttributeToken<'a>
 {
-    key: &'a str,
-    value: Box<dyn AttributeValue>,
+    name: &'a str,
+    value: StaticDispatchAttributeValue,
 }
 
 
@@ -86,7 +81,7 @@ impl AttributeCollectionIO for () {
 }
 
 // AttributeMap::AttributeCollectionIO
-impl<KeyType> AttributeCollectionIO for AttributeMap<KeyType>
+impl<KeyType> AttributeCollectionIO for DynamicDispatchAttributeMap<KeyType>
 where
     KeyType: Clone + Eq + for<'a> From<&'a str> + Hash,
 {
@@ -96,7 +91,8 @@ where
         EdgeIdType: Id,
         VertexIdType: Id,
     {
-        self.attributes.insert(token.key.into(), token.value);
+        let value: Box<dyn DynamicDispatchAttributeValue> = token.value.into();
+        self.insert(token.name.into(), value);
     }
 }
 

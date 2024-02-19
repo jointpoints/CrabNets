@@ -4,9 +4,10 @@ use crate::{
     BasicMutableGraph,
     Id,
     NexusArtError,
-    NexusArtResult
+    NexusArtResult,
+    StaticDispatchAttributeValue,
 };
-use super::Reader;
+use super::{AttributeToken, Reader};
 
 
 
@@ -36,6 +37,14 @@ enum AttributeTypeName {
 struct AttributeMetadata {
     name: String,
     type_name: AttributeTypeName,
+}
+
+struct VertexMetadata<'a, VertexIdType>
+where
+    VertexIdType: Id,
+{
+    id: VertexIdType,
+    attribute_tokens: Vec<AttributeToken<'a>>,
 }
 
 enum DeclarationSpecifierName {
@@ -235,10 +244,10 @@ fn tokenise_line(line: &str, line_number: usize) -> NexusArtResult<Vec<Token>> {
     Ok(answer)
 }
 
-fn parse_attribute_metadata(tokens: Vec<Token>, line_number: usize) -> NexusArtResult<AttributeMetadata> {
+fn parse_attribute_declaration(tokens: Vec<Token>, line_number: usize) -> NexusArtResult<AttributeMetadata> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != 3 {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected attribute declaration of the form 'AV <type> <name>' or 'AE <type> <name>, found statement with {} token(s).", line_number, tokens.len())));
+        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected attribute declaration in the form 'AV <type> <name>' or 'AE <type> <name>', found statement with {} token(s).", line_number, tokens.len())));
     }
     let type_name = match &tokens[1] {
         Token::TypeName(value) => value.clone(),
@@ -249,6 +258,17 @@ fn parse_attribute_metadata(tokens: Vec<Token>, line_number: usize) -> NexusArtR
         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected name in the attribute declaration.", line_number))),
     };
     Ok(AttributeMetadata { name, type_name })
+}
+
+fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token>, attributes: &Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
+where
+    VertexIdType: Id,
+{
+    const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
+    if tokens.len() != attributes.len() + 2 {
+        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s).", line_number, attributes.len(), tokens.len())));
+    }
+    todo!();
 }
 
 
@@ -293,11 +313,11 @@ impl Reader for GNBSReader {
             if let Token::DeclarationSpecifier(declaration_specifier) = &tokens[0] {
                 match declaration_specifier {
                     DeclarationSpecifierName::AV => match state {
-                        DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex => vertex_attributes.push(parse_attribute_metadata(tokens, line_number)?),
+                        DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex => vertex_attributes.push(parse_attribute_declaration(tokens, line_number)?),
                         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Vertex attribute declaration after a vertex declaration.", line_number))),
                     },
                     DeclarationSpecifierName::AE => match state {
-                        DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => edge_attributes.push(parse_attribute_metadata(tokens, line_number)?),
+                        DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => edge_attributes.push(parse_attribute_declaration(tokens, line_number)?),
                         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge attribute declaration after an edge declaration.", line_number))),
                     },
                     DeclarationSpecifierName::Comment => (),

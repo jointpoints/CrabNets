@@ -1,5 +1,5 @@
 use std::{collections::HashSet, iter::empty};
-use crate::{AttributeCollection, EdgeDirection, EdgeIteratorItem, EdgeToVertexRelation, Id};
+use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, EdgeToVertexRelation, Id};
 
 
 
