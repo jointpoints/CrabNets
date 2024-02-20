@@ -142,7 +142,7 @@ impl<EdgeIdType, LocaleType, VertexIdType> IO for Graph<EdgeIdType, LocaleType, 
 where
     EdgeIdType: Id,
     LocaleType: Locale<EdgeIdType, VertexIdType>,
-    VertexIdType: Id,
+    VertexIdType: Id + Into<usize>,
 {
     fn from_file(&mut self, file_name: &str) -> NexusArtResult<()> {
         const FUNCTION_PATH: &str = "Graph::IO::from_file";

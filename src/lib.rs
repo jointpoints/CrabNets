@@ -62,15 +62,13 @@ pub mod io;
 pub mod locales;
 
 use std::{
-    any::{Any, TypeId},
     collections::HashMap,
-    fmt::{Debug, Display},
+    fmt::Display,
     hash::Hash,
     marker::PhantomData,
     ops::AddAssign,
 };
-use attribute::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
-use dyn_clone::{clone_trait_object, DynClone};
+use attribute::{DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{NexusArtError, NexusArtResult};
 use locales::*;
 #[allow(unused_imports)]

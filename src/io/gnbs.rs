@@ -1,11 +1,7 @@
-use std::{fs::File, io::{BufRead, BufReader}};
+use std::{fmt::Display, fs::File, io::{BufRead, BufReader}, str::FromStr};
 use regex::Regex;
 use crate::{
-    BasicMutableGraph,
-    Id,
-    NexusArtError,
-    NexusArtResult,
-    StaticDispatchAttributeValue,
+    BasicMutableGraph, Id, NexusArtError, NexusArtResult, StaticDispatchAttributeValue
 };
 use super::{AttributeToken, Reader};
 
@@ -19,8 +15,24 @@ use super::{AttributeToken, Reader};
 
 
 
-#[derive(Clone)]
-enum AttributeTypeName {
+macro_rules! define_gnbs_attribute_type {
+    ($($type_name: ident),+) => {
+        #[derive(Clone, Eq, PartialEq)]
+        enum GNBSAttributeType {
+            $($type_name),+
+        }
+
+        impl Display for GNBSAttributeType {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(match self {
+                    $(GNBSAttributeType::$type_name => stringify!($type_name)),+
+                })
+            }
+        }
+    };
+}
+
+define_gnbs_attribute_type!(
     I1, I2, I4, I8,
     U1, U2, U4, U8,
     F4, F8,
@@ -31,13 +43,17 @@ enum AttributeTypeName {
     LB, LS,
     CI1, CI2, CI4, CI8,
     CU1, CU2, CU4, CU8,
-    CB, CS,
-}
+    CB, CS
+);
+
+
 
 struct AttributeMetadata {
     name: String,
-    type_name: AttributeTypeName,
+    gnbs_type: GNBSAttributeType,
 }
+
+
 
 struct VertexMetadata<'a, VertexIdType>
 where
@@ -47,13 +63,17 @@ where
     attribute_tokens: Vec<AttributeToken<'a>>,
 }
 
+
+
 enum DeclarationSpecifierName {
     AV, AE, V, A, E, Comment
 }
 
+
+
 enum Token<'a> {
     DeclarationSpecifier(DeclarationSpecifierName),
-    TypeName(AttributeTypeName),
+    AttributeType(GNBSAttributeType),
     Empty,
     Integer(&'a str),
     Float(&'a str),
@@ -63,6 +83,8 @@ enum Token<'a> {
     Collection(Vec<Token<'a>>),
 }
 
+
+
 #[derive(PartialEq, Eq)]
 enum TokeniserState {
     ExpectingDeclarationSpecifier,
@@ -71,6 +93,8 @@ enum TokeniserState {
     ExpectingValue,
     Terminated,
 }
+
+
 
 enum DocumentState {
     ExpectingVertexAttributeOrEdgeAttributeOrVertex,
@@ -124,43 +148,43 @@ fn extract_type_name(line: &str, line_number: usize) -> NexusArtResult<(Token, &
     let mut split = line.trim_start().splitn(2, char::is_whitespace);
     let target = split.next().unwrap();
     let type_name = match target {
-        "I1" => AttributeTypeName::I1,
-        "I2" => AttributeTypeName::I2,
-        "I4" => AttributeTypeName::I4,
-        "I8" => AttributeTypeName::I8,
-        "U1" => AttributeTypeName::U1,
-        "U2" => AttributeTypeName::U2,
-        "U4" => AttributeTypeName::U4,
-        "U8" => AttributeTypeName::U8,
-        "F4" => AttributeTypeName::F4,
-        "F8" => AttributeTypeName::F8,
-        "B" => AttributeTypeName::B,
-        "S" => AttributeTypeName::S,
-        "LI1" => AttributeTypeName::LI1,
-        "LI2" => AttributeTypeName::LI2,
-        "LI4" => AttributeTypeName::LI4,
-        "LI8" => AttributeTypeName::LI8,
-        "LU1" => AttributeTypeName::LU1,
-        "LU2" => AttributeTypeName::LU2,
-        "LU4" => AttributeTypeName::LU4,
-        "LU8" => AttributeTypeName::LU8,
-        "LF4" => AttributeTypeName::LF4,
-        "LF8" => AttributeTypeName::LF8,
-        "LB" => AttributeTypeName::LB,
-        "LS" => AttributeTypeName::LS,
-        "CI1" => AttributeTypeName::CI1,
-        "CI2" => AttributeTypeName::CI2,
-        "CI4" => AttributeTypeName::CI4,
-        "CI8" => AttributeTypeName::CI8,
-        "CU1" => AttributeTypeName::CU1,
-        "CU2" => AttributeTypeName::CU2,
-        "CU4" => AttributeTypeName::CU4,
-        "CU8" => AttributeTypeName::CU8,
-        "CB" => AttributeTypeName::CB,
-        "CS" => AttributeTypeName::CS,
+        "I1" => GNBSAttributeType::I1,
+        "I2" => GNBSAttributeType::I2,
+        "I4" => GNBSAttributeType::I4,
+        "I8" => GNBSAttributeType::I8,
+        "U1" => GNBSAttributeType::U1,
+        "U2" => GNBSAttributeType::U2,
+        "U4" => GNBSAttributeType::U4,
+        "U8" => GNBSAttributeType::U8,
+        "F4" => GNBSAttributeType::F4,
+        "F8" => GNBSAttributeType::F8,
+        "B" => GNBSAttributeType::B,
+        "S" => GNBSAttributeType::S,
+        "LI1" => GNBSAttributeType::LI1,
+        "LI2" => GNBSAttributeType::LI2,
+        "LI4" => GNBSAttributeType::LI4,
+        "LI8" => GNBSAttributeType::LI8,
+        "LU1" => GNBSAttributeType::LU1,
+        "LU2" => GNBSAttributeType::LU2,
+        "LU4" => GNBSAttributeType::LU4,
+        "LU8" => GNBSAttributeType::LU8,
+        "LF4" => GNBSAttributeType::LF4,
+        "LF8" => GNBSAttributeType::LF8,
+        "LB" => GNBSAttributeType::LB,
+        "LS" => GNBSAttributeType::LS,
+        "CI1" => GNBSAttributeType::CI1,
+        "CI2" => GNBSAttributeType::CI2,
+        "CI4" => GNBSAttributeType::CI4,
+        "CI8" => GNBSAttributeType::CI8,
+        "CU1" => GNBSAttributeType::CU1,
+        "CU2" => GNBSAttributeType::CU2,
+        "CU4" => GNBSAttributeType::CU4,
+        "CU8" => GNBSAttributeType::CU8,
+        "CB" => GNBSAttributeType::CB,
+        "CS" => GNBSAttributeType::CS,
         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected type name, found '{}'.", line_number, target))),
     };
-    Ok((Token::TypeName(type_name), split.next().unwrap_or(""), TokeniserState::ExpectingAttributeName))
+    Ok((Token::AttributeType(type_name), split.next().unwrap_or(""), TokeniserState::ExpectingAttributeName))
 }
 
 fn extract_attribute_name(line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
@@ -244,23 +268,73 @@ fn tokenise_line(line: &str, line_number: usize) -> NexusArtResult<Vec<Token>> {
     Ok(answer)
 }
 
+fn parse_numeric_value<IntoType>(original_value: &str, value_type: &GNBSAttributeType, line_number: usize) -> NexusArtResult<IntoType>
+where
+    IntoType: FromStr,
+{
+    const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
+    match original_value.parse::<IntoType>()
+    {
+        Ok(value) => Ok(value),
+        Err(_) => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, value_type, original_value))) 
+    }
+}
+
+macro_rules! convert_token_to_static_dispatch_attribute_value {
+    ($function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $conversion_expression: expr, $($origin_gnbs_value_type: ident --> $target_static_dispatch_attribute_value_variant: ident),+) => {
+        match $given_gnbs_value_type {
+            $(GNBSAttributeType::$origin_gnbs_value_type => Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant($conversion_expression)),)+
+            _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
+        }
+    };
+}
+
+fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: usize) -> NexusArtResult<StaticDispatchAttributeValue> {
+    const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
+    match token {
+        Token::Integer(value) => convert_token_to_static_dispatch_attribute_value!(
+            FUNCTION_PATH, line_number, value, gnbs_value_type,
+            parse_numeric_value(value, &gnbs_value_type, line_number)?,
+            I1 --> Int8, I2 --> Int16, I4 --> Int32, I8 --> Int64, U1 --> UInt8, U2 --> UInt16, U4 --> UInt32, U8 --> UInt64
+        ),
+        Token::Float(value) => convert_token_to_static_dispatch_attribute_value!(
+            FUNCTION_PATH, line_number, value, gnbs_value_type,
+            parse_numeric_value(value, &gnbs_value_type, line_number)?,
+            F4 --> Float32, F8 --> Float64
+        ),
+        Token::Boolean(value) => match gnbs_value_type {
+            GNBSAttributeType::B => Ok(StaticDispatchAttributeValue::Bool(match value {
+                "T" => true,
+                "F" => false,
+                _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type B, found '{}'.", line_number, value))),
+            })),
+            _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
+        },
+        Token::String(value) => match gnbs_value_type {
+            GNBSAttributeType::S => Ok(StaticDispatchAttributeValue::Str(value.to_string())),
+            _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
+        },
+        _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value.", line_number))),
+    }
+}
+
 fn parse_attribute_declaration(tokens: Vec<Token>, line_number: usize) -> NexusArtResult<AttributeMetadata> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != 3 {
         return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected attribute declaration in the form 'AV <type> <name>' or 'AE <type> <name>', found statement with {} token(s).", line_number, tokens.len())));
     }
     let type_name = match &tokens[1] {
-        Token::TypeName(value) => value.clone(),
+        Token::AttributeType(value) => value.clone(),
         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected type in the attribute declaration.", line_number))),
     };
     let name = match tokens[2] {
         Token::String(value) => value.to_string(),
         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected name in the attribute declaration.", line_number))),
     };
-    Ok(AttributeMetadata { name, type_name })
+    Ok(AttributeMetadata { name, gnbs_type: type_name })
 }
 
-fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token>, attributes: &Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
+fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
 where
     VertexIdType: Id,
 {
@@ -286,7 +360,7 @@ pub struct GNBSReader;
 
 
 // GNBSReader::Reader
-impl Reader for GNBSReader {
+impl<'a> Reader for GNBSReader {
     fn read_graph<G, EdgeIdType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
     where
         G: BasicMutableGraph<EdgeIdType, VertexIdType>,
@@ -319,6 +393,15 @@ impl Reader for GNBSReader {
                     DeclarationSpecifierName::AE => match state {
                         DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => edge_attributes.push(parse_attribute_declaration(tokens, line_number)?),
                         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge attribute declaration after an edge declaration.", line_number))),
+                    },
+                    DeclarationSpecifierName::V => match state {
+                        DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => {
+                            state = DocumentState::ExpectingVertexOrEdgeAttributeOrEdge;
+                            let vertex_metadata: VertexMetadata<'_, VertexIdType> = parse_vertex_declaration(tokens, &vertex_attributes, line_number)?;
+                            new_graph.add_v(Some(vertex_metadata.id));
+                            // Add attributes...
+                        },
+                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Vertex declaration after an edge declaration.", line_number))),
                     },
                     DeclarationSpecifierName::Comment => (),
                     _ => todo!(),
