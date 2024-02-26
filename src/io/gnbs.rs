@@ -3,7 +3,7 @@ use regex::Regex;
 use crate::{
     BasicMutableGraph, Id, NexusArtError, NexusArtResult, StaticDispatchAttributeValue
 };
-use super::{AttributeToken, Reader};
+use super::{AttributeCollectionIO, AttributeToken, Reader};
 
 
 
@@ -60,6 +60,17 @@ where
     VertexIdType: Id,
 {
     id: VertexIdType,
+    attribute_tokens: Vec<AttributeToken<'a>>,
+}
+
+
+
+struct EdgeMetadata<'a, VertexIdType>
+where
+    VertexIdType: Id,
+{
+    id1: VertexIdType,
+    id2: VertexIdType,
     attribute_tokens: Vec<AttributeToken<'a>>,
 }
 
@@ -252,7 +263,6 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
 }
 
 fn tokenise_line(line: &str, line_number: usize) -> NexusArtResult<Vec<Token>> {
-    const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     let mut answer: Vec<Token> = Vec::new();
     let mut state = TokeniserState::ExpectingDeclarationSpecifier;
     let mut new_token: Token;
@@ -393,6 +403,37 @@ where
     Ok(VertexMetadata { id, attribute_tokens })
 }
 
+fn parse_edge_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<EdgeMetadata<'a, VertexIdType>>
+where
+    VertexIdType: FromStr + Id,
+{
+    const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
+    if tokens.len() != attributes.len() + 3 {
+        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
+    }
+    let id1: VertexIdType = match tokens[1] {
+        Token::Integer(value) => match value.parse() {
+            Ok(parsed_value) => parsed_value,
+            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+        },
+        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+    };
+    let id2: VertexIdType = match tokens[2] {
+        Token::Integer(value) => match value.parse() {
+            Ok(parsed_value) => parsed_value,
+            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+        },
+        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+    };
+    let mut attribute_tokens: Vec<AttributeToken> = Vec::with_capacity(attributes.len());
+    for attribute_i in 0..attributes.len() {
+        let curr_attribute = &attributes[attribute_i];
+        let curr_token = tokens[attribute_i + 3].clone();
+        attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value: parse_value(curr_token, curr_attribute.gnbs_type, line_number)? })
+    }
+    Ok(EdgeMetadata { id1, id2, attribute_tokens })
+}
+
 
 
 
@@ -409,10 +450,12 @@ pub struct GNBSReader;
 
 // GNBSReader::Reader
 impl<'a> Reader for GNBSReader {
-    fn read_graph<G, EdgeIdType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
+    fn read_graph<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
     where
-        G: BasicMutableGraph<EdgeIdType, VertexIdType>,
+        G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+        EdgeAttributeCollectionType: AttributeCollectionIO,
         EdgeIdType: Id,
+        VertexAttributeCollectionType: AttributeCollectionIO,
         VertexIdType: FromStr + Id,
     {
         const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
@@ -446,13 +489,36 @@ impl<'a> Reader for GNBSReader {
                         DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => {
                             state = DocumentState::ExpectingVertexOrEdgeAttributeOrEdge;
                             let vertex_metadata: VertexMetadata<'_, VertexIdType> = parse_vertex_declaration(tokens, &vertex_attributes, line_number)?;
-                            new_graph.add_v(Some(vertex_metadata.id));
-                            // Add attributes...
+                            new_graph.add_v(Some(vertex_metadata.id.clone()));
+                            for attribute_token in vertex_metadata.attribute_tokens {
+                                new_graph.v_attrs_mut(&vertex_metadata.id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
+                            }
                         },
                         _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Vertex declaration after an edge declaration.", line_number))),
                     },
+                    DeclarationSpecifierName::A => match state {
+                        DocumentState::ExpectingVertexOrEdgeAttributeOrEdge | DocumentState::ExpectingEdge => {
+                            state = DocumentState::ExpectingEdge;
+                            let edge_metadata: EdgeMetadata<'_, VertexIdType> = parse_edge_declaration(tokens, &edge_attributes, line_number)?;
+                            let edge_id = new_graph.add_e(&edge_metadata.id1, &edge_metadata.id2, true, None)?;
+                            for attribute_token in edge_metadata.attribute_tokens {
+                                new_graph.e_attrs_mut(&edge_metadata.id1, &edge_metadata.id2, &edge_id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
+                            }
+                        },
+                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
+                    },
+                    DeclarationSpecifierName::E => match state {
+                        DocumentState::ExpectingVertexOrEdgeAttributeOrEdge | DocumentState::ExpectingEdge => {
+                            state = DocumentState::ExpectingEdge;
+                            let edge_metadata: EdgeMetadata<'_, VertexIdType> = parse_edge_declaration(tokens, &edge_attributes, line_number)?;
+                            let edge_id = new_graph.add_e(&edge_metadata.id1, &edge_metadata.id2, false, None)?;
+                            for attribute_token in edge_metadata.attribute_tokens {
+                                new_graph.e_attrs_mut(&edge_metadata.id1, &edge_metadata.id2, &edge_id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
+                            }
+                        },
+                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
+                    },
                     DeclarationSpecifierName::Comment => (),
-                    _ => todo!(),
                 };
             }
         }

@@ -8,9 +8,9 @@ use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Edg
 /// # Vertex together with its neighbours
 /// 
 /// ## Description
-/// This trait defines functions for **locales**. Locales are typically associated  with
-/// each vertex of a [`Graph`][graph]. They capture local topology  of  the  network  by
-/// storing all vertices adjacent to the given one  and,  furthermore,  they  store  all
+/// This trait defines an interface for **locales**. Locales  are  typically  associated
+/// with each vertex of a [`Graph`][graph]. They capture local topology of  the  network
+/// by storing all vertices adjacent to the given one and, furthermore, they  store  all
 /// [attributes][attrs] of the given vertex and edges incident on it.
 /// 
 /// [Structural features][kinds] may differ from network to  network.  Hence,  it  might
@@ -20,10 +20,12 @@ use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Edg
 /// [graph]: crate::Graph
 /// [attrs]: crate::Graph#attributes
 /// [kinds]: crate::Graph#different-kinds-of-graphs
-pub trait Locale<EdgeIdType, VertexIdType>
+pub trait Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>
 where
     Self: Clone,
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>) -> EdgeIdType;
@@ -31,10 +33,13 @@ where
     fn count_neighbours_in(&self) -> usize;
     fn count_neighbours_out(&self) -> usize;
     fn count_neighbours_undir(&self) -> usize;
-    fn get_incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn get_incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn e_attrs(&self, id2: &VertexIdType, edge_id: &EdgeIdType) -> &EdgeAttributeCollectionType;
+    fn e_attrs_mut(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> &mut EdgeAttributeCollectionType;
+    fn e_direction(&self, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<EdgeDirection>;
+    fn incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
+    fn incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
     fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
@@ -43,6 +48,8 @@ where
     fn new() -> Self;
     fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
     fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
+    fn v_attrs(&self) -> &VertexAttributeCollectionType;
+    fn v_attrs_mut(&mut self) -> &mut VertexAttributeCollectionType;
 }
 
 
@@ -55,10 +62,11 @@ where
 {
     attributes: VertexAttributeCollectionType,
     edges: HashSet<VertexIdType>,
+    edge_attributes: (),
 }
 
 // UndirectedSimpleUnattributedLocale::Locale
-impl<EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeIdType, VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
+impl<EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<(), EdgeIdType, VertexAttributeCollectionType, VertexIdType> for UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>
 where
     EdgeIdType: Id,
     VertexAttributeCollectionType: AttributeCollection,
@@ -90,7 +98,26 @@ where
         self.edges.len()
     }
 
-    fn get_incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    #[inline]
+    fn e_attrs(&self, _id2: &VertexIdType, _edge_id: &EdgeIdType) -> &() {
+        &self.edge_attributes
+    }
+
+    #[inline]
+    fn e_attrs_mut(&mut self, _id2: &VertexIdType, _edge_id: &EdgeIdType) -> &mut () {
+        &mut self.edge_attributes
+    }
+
+    #[inline]
+    fn e_direction(&self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> Option<EdgeDirection> {
+        if self.edges.contains(id2) {
+            Some(EdgeDirection::Undirected)
+        } else {
+            None
+        }
+    }
+
+    fn incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
         for id2 in self.edges.iter() {
             answer.insert(EdgeIteratorItem {
@@ -104,16 +131,16 @@ where
     }
 
     #[inline]
-    fn get_incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         HashSet::new()
     }
 
     #[inline]
-    fn get_incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         HashSet::new()
     }
 
-    fn get_incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
+    fn incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
         let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
         for id2 in self.edges.iter() {
             answer.insert(EdgeIteratorItem {
@@ -161,6 +188,7 @@ where
         UndirectedSimpleUnattributedLocale{
             attributes: VertexAttributeCollectionType::new(),
             edges: HashSet::new(),
+            edge_attributes: (),
         }
     }
 
@@ -172,5 +200,15 @@ where
     #[inline]
     fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool {
         self.edges.remove(id2)
+    }
+
+    #[inline]
+    fn v_attrs(&self) -> &VertexAttributeCollectionType {
+        &self.attributes
+    }
+
+    #[inline]
+    fn v_attrs_mut(&mut self) -> &mut VertexAttributeCollectionType {
+        &mut self.attributes
     }
 }

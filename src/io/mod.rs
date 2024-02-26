@@ -107,10 +107,12 @@ where
 
 
 pub trait Reader {
-    fn read_graph<G, EdgeIdType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
+    fn read_graph<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
     where
-        G: BasicMutableGraph<EdgeIdType, VertexIdType>,
+        G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+        EdgeAttributeCollectionType: AttributeCollectionIO,
         EdgeIdType: Id,
+        VertexAttributeCollectionType: AttributeCollectionIO,
         VertexIdType: FromStr + Id;
 }
 
@@ -138,10 +140,12 @@ pub trait IO {
 
 
 // Graph::IO
-impl<EdgeIdType, LocaleType, VertexIdType> IO for Graph<EdgeIdType, LocaleType, VertexIdType>
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> IO for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeAttributeCollectionType: AttributeCollectionIO,
     EdgeIdType: Id,
-    LocaleType: Locale<EdgeIdType, VertexIdType>,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollectionIO,
     VertexIdType: FromStr + Id + Into<usize>,
 {
     fn from_file(&mut self, file_name: &str) -> NexusArtResult<()> {

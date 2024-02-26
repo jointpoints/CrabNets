@@ -68,7 +68,7 @@ use std::{
     marker::PhantomData,
     ops::AddAssign,
 };
-use attribute::{DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
+use attribute::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{NexusArtError, NexusArtResult};
 use locales::*;
 #[allow(unused_imports)]
@@ -203,17 +203,24 @@ pub trait ImmutableGraphContainer
 where
     Self: Clone,
 {
+    type EdgeAttributeCollectionType: AttributeCollection;
     type EdgeIdType: Id;
-    type LocaleType: Locale<Self::EdgeIdType, Self::VertexIdType>;
+    type LocaleType: Locale<Self::EdgeAttributeCollectionType, Self::EdgeIdType, Self::VertexAttributeCollectionType, Self::VertexIdType>;
+    type VertexAttributeCollectionType: AttributeCollection;
     type VertexIdType: Id;
-    fn unwrap(&self) -> &Graph<Self::EdgeIdType, Self::LocaleType, Self::VertexIdType>;
+    fn unwrap(&self) -> &Graph<Self::EdgeAttributeCollectionType, Self::EdgeIdType, Self::LocaleType, Self::VertexAttributeCollectionType, Self::VertexIdType>;
 }
 
 // <T:ImmutableGraphContainer>::BasicImmutableGraph
-impl<T> BasicImmutableGraph<T::VertexIdType> for T
+impl<T> BasicImmutableGraph<T::EdgeIdType, T::VertexIdType> for T
 where
     T: Clone + ImmutableGraphContainer,
 {
+    #[inline]
+    fn contains_e(&self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> Option<EdgeDirection> {
+        self.unwrap().contains_e(id1, id2, edge_id)
+    }
+
     #[inline]
     fn contains_v(&self, id: &T::VertexIdType) -> bool {
         self.unwrap().contains_v(id)
@@ -256,11 +263,11 @@ pub trait MutableGraphContainer
 where
     Self: ImmutableGraphContainer,
 {
-    fn unwrap(&mut self) -> &mut Graph<Self::EdgeIdType, Self::LocaleType, Self::VertexIdType>;
+    fn unwrap(&mut self) -> &mut Graph<Self::EdgeAttributeCollectionType, Self::EdgeIdType, Self::LocaleType, Self::VertexAttributeCollectionType, Self::VertexIdType>;
 }
 
 // <T:MutableGraphContainer>::BasicMutableGraph
-impl<T> BasicMutableGraph<T::EdgeIdType, T::VertexIdType> for T
+impl<T> BasicMutableGraph<T::EdgeAttributeCollectionType, T::EdgeIdType, T::VertexAttributeCollectionType, T::VertexIdType> for T
 where
     T: Clone + MutableGraphContainer,
 {
@@ -275,6 +282,11 @@ where
     }
 
     #[inline]
+    fn e_attrs_mut(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> NexusArtResult<&mut T::EdgeAttributeCollectionType> {
+        self.unwrap().e_attrs_mut(id1, id2, edge_id)
+    }
+
+    #[inline]
     fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> NexusArtResult<bool> {
         self.unwrap().remove_e(id1, id2, edge_id)
     }
@@ -282,6 +294,11 @@ where
     #[inline]
     fn remove_v(&mut self, id: &T::VertexIdType) -> bool {
         self.unwrap().remove_v(id)
+    }
+
+    #[inline]
+    fn v_attrs_mut(&mut self, id: &T::VertexIdType) -> NexusArtResult<&mut T::VertexAttributeCollectionType> {
+        self.unwrap().v_attrs_mut(id)
     }
 }
 
@@ -303,11 +320,46 @@ where
 /// 
 /// This  trait  is  implemented  for   [`Graph`]   and   any   type   that   implements
 /// [`ImmutableGraphContainer`].
-pub trait BasicImmutableGraph<VertexIdType>
+pub trait BasicImmutableGraph<EdgeIdType, VertexIdType>
 where
     Self: Clone,
+    EdgeIdType: Id,
     VertexIdType: Id,
 {
+    /// # Check existence of edge
+    /// 
+    /// ## Description
+    /// Check whether the given edge exists and, if it exists, get its orientation.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id1` : `&VertexIdType` - an immutable  reference  to  the  ID  of  the  first
+    /// vertex.
+    /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
+    /// vertex.
+    /// * `edge_id` : `&EdgeIdType` - if edge IDs are  supported  (see [Details]),  then
+    /// the existence of the edge between `id1` and `id2`  with  ID  `edge_id`  will  be
+    /// checked.
+    /// 
+    /// ## Returns
+    /// * `Option<EdgeDirection>` - `Some(value)` is returned if both given vertices and
+    /// the given edge exist, `value` indicates the direction of  the  edge;  `None`  is
+    /// returned otherwise.
+    /// 
+    /// <div id="contains-e-details" style="margin-top: -15px;">
+    /// 
+    /// ## Details
+    /// 
+    /// </div>
+    /// 
+    /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
+    /// ignored as simple graphs don't support edge IDs.  In  this  case,  if  the  edge
+    /// between  `id1`  and  `id2`   exists,   the   return   value   will   always   be
+    /// `Some(EdgeDirection::Undirected)`.
+    /// 
+    /// [Details]: #contains-e-details
+    /// [kinds]: Graph#different-kinds-of-graphs
+    fn contains_e(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<EdgeDirection>;
     /// # Check existence of vertex
     /// 
     /// ## Description
@@ -440,10 +492,12 @@ where
 /// 
 /// This  trait  is  implemented  for   [`Graph`]   and   any   type   that   implements
 /// [`MutableGraphContainer`].
-pub trait BasicMutableGraph<EdgeIdType, VertexIdType>
+pub trait BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>
 where
-    Self: BasicImmutableGraph<VertexIdType>,
+    Self: BasicImmutableGraph<EdgeIdType, VertexIdType>,
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     /// # Add edge
@@ -513,6 +567,40 @@ where
     /// 
     /// [attrs]: Graph#attributes
     fn add_v(&mut self, id: Option<VertexIdType>) -> VertexIdType;
+    /// # Get a mutable reference to edge attributes
+    /// ## Description
+    /// Get a mutable reference to the [attribute collection][attrs]  of  the  specified
+    /// vertex.
+    ///
+    /// ## Arguments
+    /// * `&mut self` - a mutable reference to the caller.
+    /// * `id1` : `&VertexIdType` - an immutable  reference  to  the  ID  of  the  first
+    /// vertex.
+    /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
+    /// vertex.
+    /// * `edge_id` : `&EdgeIdType` - if edge IDs are supported (see [Details]), then an
+    /// attribute collection of the edge between `id1` and `id2` with ID `edge_id`  will
+    /// be retrieved.
+    /// 
+    /// ## Returns
+    /// * `NexusArtResult<&mut EdgeAttributeCollectionType>` - `Ok(value)`  is  returned
+    /// if the given edge exists; `Err(NexusArtError)` is returned otherwise.
+    /// 
+    /// <div id="get-e-attrs-mut-details" style="margin-top: -15px;">
+    /// 
+    /// ## Details
+    /// 
+    /// </div>
+    /// 
+    /// Even if the edge with ID `edge_id` is directed, the order of  values  `id1`  and
+    /// `id2` doesn't matter.
+    /// 
+    /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
+    /// ignored as simple graphs don't support edge IDs.
+    /// 
+    /// [Details]: #get-e-attrs-mut-details
+    /// [kinds]: Graph#different-kinds-of-graphs
+    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<&mut EdgeAttributeCollectionType>;
     /// # Remove edge
     /// 
     /// ## Description
@@ -561,6 +649,23 @@ where
     /// * `bool` - shows whether the vertex with ID `id` existed when this function  was
     /// called.
     fn remove_v(&mut self, id: &VertexIdType) -> bool;
+    /// # Get a mutable reference to vertex attributes
+    /// 
+    /// ## Description
+    /// Get a mutable reference to the [attribute collection][attrs]  of  the  specified
+    /// vertex.
+    /// 
+    /// ## Arguments
+    /// * `&mut self` - a mutable reference to the caller.
+    /// * `id` : `VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// * `NexusArtResult<&mut VertexAttributeCollectionType>` - `Ok(value)` is returned
+    /// if the vertex  with  the  given  ID  exists;  `Err(NexusArtError)`  is  returned
+    /// otherwise.
+    /// 
+    /// [attrs]: attribute::AttributeCollection
+    fn v_attrs_mut(&mut self, id: &VertexIdType) -> NexusArtResult<&mut VertexAttributeCollectionType>;
 }
 
 
@@ -597,22 +702,26 @@ where
 /// ## Attributes
 /// Vertices and edges of graphs can store attributes.
 #[derive(Clone)]
-pub struct Graph<EdgeIdType, LocaleType, VertexIdType>
+pub struct Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
-    LocaleType: Locale<EdgeIdType, VertexIdType>,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     edge_list: HashMap<VertexIdType, LocaleType>,
     min_free_vertex_id: VertexIdType,
-    phantom: PhantomData<EdgeIdType>,
+    phantom: PhantomData<(EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType)>,
 }
 
 // Graph::Graph
-impl<EdgeIdType, LocaleType, VertexIdType> Graph<EdgeIdType, LocaleType, VertexIdType>
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
-    LocaleType: Locale<EdgeIdType, VertexIdType>,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     pub fn new() -> Self {
@@ -621,12 +730,22 @@ where
 }
 
 // Graph::BasicImmutableGraph
-impl<EdgeIdType, LocaleType, VertexIdType> BasicImmutableGraph<VertexIdType> for Graph<EdgeIdType, LocaleType, VertexIdType>
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> BasicImmutableGraph<EdgeIdType, VertexIdType> for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
-    LocaleType: Locale<EdgeIdType, VertexIdType>,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
+    #[inline]
+    fn contains_e(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<EdgeDirection> {
+        match self.edge_list.get(id1) {
+            Some(value) => value.e_direction(id2, edge_id),
+            None => None,
+        }
+    }
+
     #[inline]
     fn contains_v(&self, id: &VertexIdType) -> bool {
         self.edge_list.contains_key(id)
@@ -683,10 +802,12 @@ where
 }
 
 // Graph::BasicMutableGraph
-impl<EdgeIdType, LocaleType, VertexIdType> BasicMutableGraph<EdgeIdType, VertexIdType> for Graph<EdgeIdType, LocaleType, VertexIdType>
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
-    LocaleType: Locale<EdgeIdType, VertexIdType>,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> NexusArtResult<EdgeIdType> {
@@ -736,6 +857,26 @@ where
         return_value
     }
 
+    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<&mut EdgeAttributeCollectionType> {
+        const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::e_attrs_mut";
+        if self.edge_list.contains_key(id1) {
+            if self.edge_list.contains_key(id2) {
+                match self.contains_e(id1, id2, edge_id) {
+                    Some(value) => match value {
+                        EdgeDirection::Undirected => Ok(self.edge_list.get_mut(if id1 <= id2 { id1 } else { id2 }).unwrap().e_attrs_mut(if id1 <= id2 { id2 } else { id1 }, edge_id)),
+                        EdgeDirection::Directed1to2 => Ok(self.edge_list.get_mut(id1).unwrap().e_attrs_mut(id2, edge_id)),
+                        EdgeDirection::Directed2to1 => Ok(self.edge_list.get_mut(id2).unwrap().e_attrs_mut(id1, edge_id)),
+                    },
+                    None => Err(NexusArtError::new(FUNCTION_PATH, format!("Accessing attributes of a non-existing edge between vertices {} and {} with edge ID {}.", id1, id2, edge_id))),
+                }
+            } else {
+                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+            }
+        } else {
+            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+        }
+    }
+
     fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::delete_e";
         if self.edge_list.contains_key(id1) {
@@ -754,7 +895,7 @@ where
         if !self.edge_list.contains_key(id) {
             return false;
         }
-        for edge in self.edge_list[id].get_incident_e() {
+        for edge in self.edge_list[id].incident_e() {
             self.remove_e(&edge.id1, &edge.id2, &edge.edge_id).unwrap();
         }
         self.edge_list.remove(id);
@@ -762,6 +903,14 @@ where
             self.min_free_vertex_id = id.clone();
         }
         true
+    }
+
+    fn v_attrs_mut(&mut self, id: &VertexIdType) -> NexusArtResult<&mut VertexAttributeCollectionType> {
+        const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::v_attrs_mut";
+        match self.edge_list.get_mut(id) {
+            Some(value) => Ok(value.v_attrs_mut()),
+            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
     }
 }
 
@@ -855,24 +1004,24 @@ macro_rules! graph {
     (X ---X--- X with $($property:path = $value:ty),+) => {
         {
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<u8, UndirectedSimpleUnattributedLocale<(), VertexIdType>, VertexIdType>::new()
+            Graph::<(), u8, UndirectedSimpleUnattributedLocale<(), VertexIdType>, (), VertexIdType>::new()
         }
     };
 
     (X ---X--- X) => {
-        Graph::<u8, UndirectedSimpleUnattributedLocale<(), usize>, usize>::new()
+        Graph::<(), u8, UndirectedSimpleUnattributedLocale<(), usize>, (), usize>::new()
     };
 
     (D ---X--- D with $($property:path = $value:ty),+) => {
         {
             type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>);
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<u8, UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>, VertexIdType>::new()
+            Graph::<(), u8, UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>, VertexAttributeCollectionType, VertexIdType>::new()
         }
     };
 
     (D ---X--- D) => {
-        Graph::<u8, UndirectedSimpleUnattributedLocale<DynamicDispatchAttributeMap<String>, usize>, usize>::new()
+        Graph::<(), u8, UndirectedSimpleUnattributedLocale<DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>::new()
     };
 }
 
