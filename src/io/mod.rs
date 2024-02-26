@@ -20,7 +20,7 @@
 //! [mgc]: crate::MutableGraphContainer
 mod gnbs;
 
-use std::{fs::File, hash::Hash};
+use std::{fs::File, hash::Hash, str::FromStr};
 use crate::{
     attribute::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue},
     errors::{NexusArtError, NexusArtResult},
@@ -111,7 +111,7 @@ pub trait Reader {
     where
         G: BasicMutableGraph<EdgeIdType, VertexIdType>,
         EdgeIdType: Id,
-        VertexIdType: Id;
+        VertexIdType: FromStr + Id;
 }
 
 
@@ -142,7 +142,7 @@ impl<EdgeIdType, LocaleType, VertexIdType> IO for Graph<EdgeIdType, LocaleType, 
 where
     EdgeIdType: Id,
     LocaleType: Locale<EdgeIdType, VertexIdType>,
-    VertexIdType: Id + Into<usize>,
+    VertexIdType: FromStr + Id + Into<usize>,
 {
     fn from_file(&mut self, file_name: &str) -> NexusArtResult<()> {
         const FUNCTION_PATH: &str = "Graph::IO::from_file";

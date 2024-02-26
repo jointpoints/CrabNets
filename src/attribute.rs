@@ -85,11 +85,11 @@ define_static_dispatch_attribute_value_enum!(
     Float32(f32), Float64(f64),
     Bool(bool), Str(String),
     VecInt8(Vec<i8>), VecInt16(Vec<i16>), VecInt32(Vec<i32>), VecInt64(Vec<i64>),
-    VecUInt8(Vec<i8>), VecUInt16(Vec<i16>), VecUInt32(Vec<i32>), VecUInt64(Vec<i64>),
+    VecUInt8(Vec<u8>), VecUInt16(Vec<u16>), VecUInt32(Vec<u32>), VecUInt64(Vec<u64>),
     VecFloat32(Vec<f32>), VecFloat64(Vec<f64>),
     VecBool(Vec<bool>), VecStr(Vec<String>),
     SetInt8(HashSet<i8>), SetInt16(HashSet<i16>), SetInt32(HashSet<i32>), SetInt64(HashSet<i64>),
-    SetUInt8(HashSet<i8>), SetUInt16(HashSet<i16>), SetUInt32(HashSet<i32>), SetUInt64(HashSet<i64>),
+    SetUInt8(HashSet<u8>), SetUInt16(HashSet<u16>), SetUInt32(HashSet<u32>), SetUInt64(HashSet<u64>),
     SetBool(HashSet<bool>), SetStr(HashSet<String>)
 );
 

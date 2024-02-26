@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs::File, io::{BufRead, BufReader}, str::FromStr};
+use std::{collections::HashSet, fmt::Display, fs::File, io::{BufRead, BufReader}, str::FromStr};
 use regex::Regex;
 use crate::{
     BasicMutableGraph, Id, NexusArtError, NexusArtResult, StaticDispatchAttributeValue
@@ -17,7 +17,7 @@ use super::{AttributeToken, Reader};
 
 macro_rules! define_gnbs_attribute_type {
     ($($type_name: ident),+) => {
-        #[derive(Clone, Eq, PartialEq)]
+        #[derive(Clone, Copy, Debug)]
         enum GNBSAttributeType {
             $($type_name),+
         }
@@ -65,12 +65,14 @@ where
 
 
 
+#[derive(Clone, Debug)]
 enum DeclarationSpecifierName {
     AV, AE, V, A, E, Comment
 }
 
 
 
+#[derive(Clone, Debug)]
 enum Token<'a> {
     DeclarationSpecifier(DeclarationSpecifierName),
     AttributeType(GNBSAttributeType),
@@ -281,10 +283,28 @@ where
 }
 
 macro_rules! convert_token_to_static_dispatch_attribute_value {
-    ($function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $conversion_expression: expr, $($origin_gnbs_value_type: ident --> $target_static_dispatch_attribute_value_variant: ident),+) => {
+    // Atomic values
+    (atomic value: $function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $($origin_gnbs_value_type: ident --> $target_static_dispatch_attribute_value_variant: ident),+) => {
         match $given_gnbs_value_type {
-            $(GNBSAttributeType::$origin_gnbs_value_type => Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant($conversion_expression)),)+
-            _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
+            $(GNBSAttributeType::$origin_gnbs_value_type => Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(parse_numeric_value($value, &$given_gnbs_value_type, $line_number)?)),)+
+            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
+        }
+    };
+
+    // Complex values
+    (complex value ($target_core_container: ident, $target_core_container_insert_function: ident): $function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $($origin_gnbs_value_type: ident --[$atomic_gnbs_value_type: ident --[$target_core_container_value_type: ty]--> $atomic_static_dispatch_attribute_value_variant:ident]--> $target_static_dispatch_attribute_value_variant: ident),+) => {
+        match $given_gnbs_value_type {
+            $(GNBSAttributeType::$origin_gnbs_value_type => {
+                let mut core_container: $target_core_container<$target_core_container_value_type> = $target_core_container::with_capacity($value.len());
+                for atomic_value_token in $value.iter() {
+                    core_container.$target_core_container_insert_function(match parse_value(atomic_value_token.clone(), GNBSAttributeType::$atomic_gnbs_value_type, $line_number) {
+                        Ok(StaticDispatchAttributeValue::$atomic_static_dispatch_attribute_value_variant(atomic_value)) => atomic_value,
+                        _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{:?}'.", $line_number, $given_gnbs_value_type, $value))),
+                    });
+                }
+                Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(core_container))
+            },)+
+            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{:?}'.", $line_number, $given_gnbs_value_type, $value))),
         }
     };
 }
@@ -293,13 +313,13 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     match token {
         Token::Integer(value) => convert_token_to_static_dispatch_attribute_value!(
+            atomic value:
             FUNCTION_PATH, line_number, value, gnbs_value_type,
-            parse_numeric_value(value, &gnbs_value_type, line_number)?,
             I1 --> Int8, I2 --> Int16, I4 --> Int32, I8 --> Int64, U1 --> UInt8, U2 --> UInt16, U4 --> UInt32, U8 --> UInt64
         ),
         Token::Float(value) => convert_token_to_static_dispatch_attribute_value!(
+            atomic value:
             FUNCTION_PATH, line_number, value, gnbs_value_type,
-            parse_numeric_value(value, &gnbs_value_type, line_number)?,
             F4 --> Float32, F8 --> Float64
         ),
         Token::Boolean(value) => match gnbs_value_type {
@@ -314,6 +334,21 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
             GNBSAttributeType::S => Ok(StaticDispatchAttributeValue::Str(value.to_string())),
             _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
         },
+        Token::List(value) => convert_token_to_static_dispatch_attribute_value!(
+            complex value (Vec, push):
+            FUNCTION_PATH, line_number, value, gnbs_value_type,
+            LI1 --[I1 --[i8]--> Int8]--> VecInt8, LI2 --[I2 --[i16]--> Int16]--> VecInt16, LI4 --[I4 --[i32]--> Int32]--> VecInt32, LI8 --[I8 --[i64]--> Int64]--> VecInt64,
+            LU1 --[U1 --[u8]--> UInt8]--> VecUInt8, LU2 --[U2 --[u16]--> UInt16]--> VecUInt16, LU4 --[U4 --[u32]--> UInt32]--> VecUInt32, LU8 --[U8 --[u64]--> UInt64]--> VecUInt64,
+            LF4 --[F4 --[f32]--> Float32]--> VecFloat32, LF8 --[F8 --[f64]--> Float64]--> VecFloat64,
+            LB --[B --[bool]--> Bool]--> VecBool, LS --[S --[String]--> Str]--> VecStr
+        ),
+        Token::Collection(value) => convert_token_to_static_dispatch_attribute_value!(
+            complex value (HashSet, insert):
+            FUNCTION_PATH, line_number, value, gnbs_value_type,
+            CI1 --[I1 --[i8]--> Int8]--> SetInt8, CI2 --[I2 --[i16]--> Int16]--> SetInt16, CI4 --[I4 --[i32]--> Int32]--> SetInt32, CI8 --[I8 --[i64]--> Int64]--> SetInt64,
+            CU1 --[U1 --[u8]--> UInt8]--> SetUInt8, CU2 --[U2 --[u16]--> UInt16]--> SetUInt16, CU4 --[U4 --[u32]--> UInt32]--> SetUInt32, CU8 --[U8 --[u64]--> UInt64]--> SetUInt64,
+            CB --[B --[bool]--> Bool]--> SetBool, CS --[S --[String]--> Str]--> SetStr
+        ),
         _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value.", line_number))),
     }
 }
@@ -334,15 +369,28 @@ fn parse_attribute_declaration(tokens: Vec<Token>, line_number: usize) -> NexusA
     Ok(AttributeMetadata { name, gnbs_type: type_name })
 }
 
-fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
+fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
 where
-    VertexIdType: Id,
+    VertexIdType: FromStr + Id,
 {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != attributes.len() + 2 {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s).", line_number, attributes.len(), tokens.len())));
+        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
     }
-    todo!();
+    let id: VertexIdType = match tokens[1] {
+        Token::Integer(value) => match value.parse() {
+            Ok(parsed_value) => parsed_value,
+            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+        },
+        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+    };
+    let mut attribute_tokens: Vec<AttributeToken> = Vec::with_capacity(attributes.len());
+    for attribute_i in 0..attributes.len() {
+        let curr_attribute = &attributes[attribute_i];
+        let curr_token = tokens[attribute_i + 2].clone();
+        attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value: parse_value(curr_token, curr_attribute.gnbs_type, line_number)? })
+    }
+    Ok(VertexMetadata { id, attribute_tokens })
 }
 
 
@@ -365,7 +413,7 @@ impl<'a> Reader for GNBSReader {
     where
         G: BasicMutableGraph<EdgeIdType, VertexIdType>,
         EdgeIdType: Id,
-        VertexIdType: Id,
+        VertexIdType: FromStr + Id,
     {
         const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
         let mut new_graph = graph.clone();
