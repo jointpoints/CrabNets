@@ -94,7 +94,7 @@ use private::ConditionalType;
 /// displayable.
 pub trait Id
 where
-    Self: Clone + Display + Eq + Hash + Ord,
+    Self: Clone + Default + Display + Eq + Hash + Ord,
 {
     /// # Default value of ID
     /// 
@@ -108,7 +108,7 @@ where
     /// 
     /// ## Returns
     /// `Self` - the default value for the first possible ID.
-    fn default() -> Self;
+    // fn default() -> Self;
     /// # Advance the element
     /// 
     /// ## Description
@@ -126,9 +126,9 @@ where
 macro_rules! implement_vertex_id_trait_for {
     ($t: ty) => {
         impl Id for $t {
-            fn default() -> Self {
+            /*fn default() -> Self {
                 <$t>::MIN
-            }
+            }*/
         
             fn increment(&mut self) {
                 self.add_assign(1)
@@ -201,7 +201,7 @@ where
 
 pub trait ImmutableGraphContainer
 where
-    Self: Clone,
+    Self: Clone + Default,
 {
     type EdgeAttributeCollectionType: AttributeCollection;
     type EdgeIdType: Id;
@@ -322,7 +322,7 @@ where
 /// [`ImmutableGraphContainer`].
 pub trait BasicImmutableGraph<EdgeIdType, VertexIdType>
 where
-    Self: Clone,
+    Self: Clone + Default,
     EdgeIdType: Id,
     VertexIdType: Id,
 {
@@ -701,7 +701,7 @@ where
 /// 
 /// ## Attributes
 /// Vertices and edges of graphs can store attributes.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
@@ -1012,7 +1012,7 @@ macro_rules! graph {
         Graph::<(), u8, UndirectedSimpleUnattributedLocale<(), usize>, (), usize>::new()
     };
 
-    (D ---X--- D with $($property:path = $value:ty),+) => {
+    (A ---X--- A with $($property:path = $value:ty),+) => {
         {
             type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>);
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
@@ -1020,7 +1020,7 @@ macro_rules! graph {
         }
     };
 
-    (D ---X--- D) => {
+    (A ---X--- A) => {
         Graph::<(), u8, UndirectedSimpleUnattributedLocale<DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>::new()
     };
 }
@@ -1031,7 +1031,9 @@ macro_rules! graph {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::BufReader;
+
+    use crate::{io::{gnbs::GNBSReader, Reader}, *};
 
     #[test]
     fn graph_new_xxx_with() {
@@ -1039,23 +1041,23 @@ mod tests {
         with
             GraphProperty::VertexIdType = i8
         );
-        assert_eq!(g.add_v(None), -128);
+        assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn graph_new_axa() {
-        let mut g = graph!(D ---X--- D);
+        let mut g = graph!(A ---X--- A);
         assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn graph_new_axa_with() {
-        let mut g = graph!(D ---X--- D
+        let mut g = graph!(A ---X--- A
         with
             GraphProperty::VertexIdType = i8,
             GraphProperty::VertexAttributeCollectionType = ()
         );
-        assert_eq!(g.add_v(None), -128);
+        assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
@@ -1095,5 +1097,27 @@ mod tests {
         assert_eq!(g.add_v(None), 3);
         assert_eq!(g.count_v(), 5);
         assert_eq!(g.count_e(), 1);
+    }
+
+    #[test]
+    fn read_gnbs() {
+        const INPUT: &str = "
+        # Test number 1
+        AV LS Names
+        V 1 X
+        V 3 [ \"Romy , \" , ]
+        V 2 [     ]
+        E 1 2
+        E 2 3
+        ";
+        let buffer_reader = BufReader::new(INPUT.as_bytes());
+        let gnbs_reader = GNBSReader;
+        let mut g = graph!(A ---X--- A);
+        let g_result = gnbs_reader.read_graph(buffer_reader);
+        assert!(g_result.is_ok());
+        g = g_result.unwrap();
+        assert_eq!(g.count_v(), 3);
+        assert_eq!(g.count_e(), 2);
+        assert_eq!(g.v_attrs_mut(&3).unwrap().get(&"Names".to_string()).unwrap().downcast::<Vec<String>>().unwrap(), &vec!["Romy , ".to_string()]);
     }
 }

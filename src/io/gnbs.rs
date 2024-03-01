@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display, fs::File, io::{BufRead, BufReader}, str::FromStr};
+use std::{collections::HashSet, fmt::Display, io::{BufRead, BufReader, Read}, str::FromStr};
 use regex::Regex;
 use crate::{
     BasicMutableGraph, Id, NexusArtError, NexusArtResult, StaticDispatchAttributeValue
@@ -209,6 +209,39 @@ fn extract_attribute_name(line: &str, line_number: usize) -> NexusArtResult<(Tok
     Ok((Token::String(target), "", TokeniserState::Terminated))
 }
 
+fn split_complex_literal_into_atomics(values: &str) -> Vec<&str> {
+    let mut answer = Vec::new();
+    let mut curr_value_start_i = 0;
+    let mut curr_value_end_i = 0;
+    let mut inside_string = false;
+    for symbol in values.chars() {
+        match symbol {
+            '"' => {
+                inside_string = !inside_string;
+                curr_value_end_i += 1;
+            },
+            ',' => if inside_string {
+                curr_value_end_i += 1;
+            } else {
+                answer.push(&values[curr_value_start_i..curr_value_end_i]);
+                curr_value_end_i += 1;
+                curr_value_start_i = curr_value_end_i;
+            },
+            c if c.is_whitespace() => {
+                curr_value_end_i += 1;
+                if !inside_string && curr_value_start_i + 1 == curr_value_end_i {
+                    curr_value_start_i += 1;
+                }
+            },
+            _ => curr_value_end_i += 1,
+        }
+    }
+    if curr_value_start_i != curr_value_end_i {
+        answer.push(&values[curr_value_start_i..curr_value_end_i]);
+    }
+    answer
+}
+
 fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     line = line.trim_start();
@@ -223,24 +256,24 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
             split.1.trim_start()
         },
         Some('[') => {
-            let split = match line.split_once(']') {
+            let split = match line.get(1..).unwrap().split_once(']') {
                 Some(value) => value,
                 None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (]) wasn't found for a list value.", line_number))),
             };
-            let elements = split.0
-                .split(',')
+            let elements = split_complex_literal_into_atomics(split.0)
+                .into_iter()
                 .map(|x| Ok(extract_value(x.trim(), line_number)?.0))
                 .collect::<NexusArtResult<Vec<_>>>()?;
             token = Token::List(elements);
             split.1.trim_start()
         },
         Some('{') => {
-            let split = match line.split_once('}') {
+            let split = match line.get(1..).unwrap().split_once('}') {
                 Some(value) => value,
                 None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (}}) wasn't found for a collection value.", line_number))),
             };
-            let elements = split.0
-                .split(',')
+            let elements = split_complex_literal_into_atomics(split.0)
+                .into_iter()
                 .map(|x| Ok(extract_value(x.trim(), line_number)?.0))
                 .collect::<NexusArtResult<Vec<_>>>()?;
             token = Token::Collection(elements);
@@ -296,7 +329,7 @@ macro_rules! convert_token_to_static_dispatch_attribute_value {
     // Atomic values
     (atomic value: $function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $($origin_gnbs_value_type: ident --> $target_static_dispatch_attribute_value_variant: ident),+) => {
         match $given_gnbs_value_type {
-            $(GNBSAttributeType::$origin_gnbs_value_type => Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(parse_numeric_value($value, &$given_gnbs_value_type, $line_number)?)),)+
+            $(GNBSAttributeType::$origin_gnbs_value_type => Ok(Some(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(parse_numeric_value($value, &$given_gnbs_value_type, $line_number)?))),)+
             _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
         }
     };
@@ -308,18 +341,18 @@ macro_rules! convert_token_to_static_dispatch_attribute_value {
                 let mut core_container: $target_core_container<$target_core_container_value_type> = $target_core_container::with_capacity($value.len());
                 for atomic_value_token in $value.iter() {
                     core_container.$target_core_container_insert_function(match parse_value(atomic_value_token.clone(), GNBSAttributeType::$atomic_gnbs_value_type, $line_number) {
-                        Ok(StaticDispatchAttributeValue::$atomic_static_dispatch_attribute_value_variant(atomic_value)) => atomic_value,
-                        _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{:?}'.", $line_number, $given_gnbs_value_type, $value))),
+                        Ok(Some(StaticDispatchAttributeValue::$atomic_static_dispatch_attribute_value_variant(atomic_value))) => atomic_value,
+                        _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
                     });
                 }
-                Ok(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(core_container))
+                Ok(Some(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(core_container)))
             },)+
-            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{:?}'.", $line_number, $given_gnbs_value_type, $value))),
+            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
         }
     };
 }
 
-fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: usize) -> NexusArtResult<StaticDispatchAttributeValue> {
+fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: usize) -> NexusArtResult<Option<StaticDispatchAttributeValue>> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     match token {
         Token::Integer(value) => convert_token_to_static_dispatch_attribute_value!(
@@ -333,15 +366,15 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
             F4 --> Float32, F8 --> Float64
         ),
         Token::Boolean(value) => match gnbs_value_type {
-            GNBSAttributeType::B => Ok(StaticDispatchAttributeValue::Bool(match value {
+            GNBSAttributeType::B => Ok(Some(StaticDispatchAttributeValue::Bool(match value {
                 "T" => true,
                 "F" => false,
                 _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type B, found '{}'.", line_number, value))),
-            })),
+            }))),
             _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
         },
         Token::String(value) => match gnbs_value_type {
-            GNBSAttributeType::S => Ok(StaticDispatchAttributeValue::Str(value.to_string())),
+            GNBSAttributeType::S => Ok(Some(StaticDispatchAttributeValue::Str(value.to_string()))),
             _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
         },
         Token::List(value) => convert_token_to_static_dispatch_attribute_value!(
@@ -359,6 +392,7 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
             CU1 --[U1 --[u8]--> UInt8]--> SetUInt8, CU2 --[U2 --[u16]--> UInt16]--> SetUInt16, CU4 --[U4 --[u32]--> UInt32]--> SetUInt32, CU8 --[U8 --[u64]--> UInt64]--> SetUInt64,
             CB --[B --[bool]--> Bool]--> SetBool, CS --[S --[String]--> Str]--> SetStr
         ),
+        Token::Empty => Ok(None),
         _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value.", line_number))),
     }
 }
@@ -398,7 +432,10 @@ where
     for attribute_i in 0..attributes.len() {
         let curr_attribute = &attributes[attribute_i];
         let curr_token = tokens[attribute_i + 2].clone();
-        attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value: parse_value(curr_token, curr_attribute.gnbs_type, line_number)? })
+        match parse_value(curr_token, curr_attribute.gnbs_type, line_number)? {
+            Some(value) => attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value }),
+            None => (),
+        };
     }
     Ok(VertexMetadata { id, attribute_tokens })
 }
@@ -429,7 +466,10 @@ where
     for attribute_i in 0..attributes.len() {
         let curr_attribute = &attributes[attribute_i];
         let curr_token = tokens[attribute_i + 3].clone();
-        attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value: parse_value(curr_token, curr_attribute.gnbs_type, line_number)? })
+        match parse_value(curr_token, curr_attribute.gnbs_type, line_number)? {
+            Some(value) => attribute_tokens.push(AttributeToken { name: &curr_attribute.name, value }),
+            None => (),
+        }
     }
     Ok(EdgeMetadata { id1, id2, attribute_tokens })
 }
@@ -450,23 +490,22 @@ pub struct GNBSReader;
 
 // GNBSReader::Reader
 impl<'a> Reader for GNBSReader {
-    fn read_graph<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
+    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> NexusArtResult<G>
     where
         G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+        R: Read,
         EdgeAttributeCollectionType: AttributeCollectionIO,
         EdgeIdType: Id,
         VertexAttributeCollectionType: AttributeCollectionIO,
         VertexIdType: FromStr + Id,
     {
         const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
-        let mut new_graph = graph.clone();
-        // add .clear() above
+        let mut new_graph = G::default();
         let mut state = DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex;
         let mut vertex_attributes: Vec<AttributeMetadata> = Vec::new();
         let mut edge_attributes: Vec<AttributeMetadata> = Vec::new();
-        let buffer = BufReader::new(file);
         let mut line_number = 0usize;
-        for line_result in buffer.lines() {
+        for line_result in buffer_reader.lines() {
             line_number += 1;
             let line = match line_result {
                 Ok(value) => value,
@@ -522,7 +561,6 @@ impl<'a> Reader for GNBSReader {
                 };
             }
         }
-        *graph = new_graph;
-        Ok(())
+        Ok(new_graph)
     }
 }

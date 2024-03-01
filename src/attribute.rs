@@ -105,17 +105,17 @@ define_static_dispatch_attribute_value_enum!(
 
 pub trait AttributeCollection
 where
-    Self: Clone,
+    Self: Clone + Default,
 {
     fn new() -> Self;
 }
 
 
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DynamicDispatchAttributeMap<KeyType>
 where
-    KeyType: Clone + Eq + Hash,
+    KeyType: Clone + Default + Eq + Hash,
 {
     attributes: HashMap<KeyType, Box<dyn DynamicDispatchAttributeValue>>,
 }
@@ -123,8 +123,12 @@ where
 // DynamicDispatchAttributeMap::DynamicDispatchAttributeMap
 impl<KeyType> DynamicDispatchAttributeMap<KeyType>
 where
-    KeyType: Clone + Eq + Hash,
+    KeyType: Clone + Default + Eq + Hash,
 {
+    pub fn get(&self, name: &KeyType) -> Option<&Box<dyn DynamicDispatchAttributeValue>> {
+        self.attributes.get(name)
+    }
+    
     pub fn insert(&mut self, name: KeyType, value: Box<dyn DynamicDispatchAttributeValue>) -> Option<Box<dyn DynamicDispatchAttributeValue>> {
         self.attributes.insert(name, value)
     }
@@ -133,7 +137,7 @@ where
 // DynamicDispatchAttributeMap::AttributeCollection
 impl<KeyType> AttributeCollection for DynamicDispatchAttributeMap<KeyType>
 where
-    KeyType: Clone + Eq + Hash,
+    KeyType: Clone + Default + Eq + Hash,
 {
     fn new() -> Self {
         DynamicDispatchAttributeMap { attributes: HashMap::new() }

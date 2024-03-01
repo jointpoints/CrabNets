@@ -18,9 +18,9 @@
 //! [graph]: crate::Graph
 //! [igc]: crate::ImmutableGraphContainer
 //! [mgc]: crate::MutableGraphContainer
-mod gnbs;
+pub mod gnbs;
 
-use std::{fs::File, hash::Hash, str::FromStr};
+use std::{fs::File, hash::Hash, io::{BufReader, Read}, str::FromStr};
 use crate::{
     attribute::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue},
     errors::{NexusArtError, NexusArtResult},
@@ -83,7 +83,7 @@ impl AttributeCollectionIO for () {
 // AttributeMap::AttributeCollectionIO
 impl<KeyType> AttributeCollectionIO for DynamicDispatchAttributeMap<KeyType>
 where
-    KeyType: Clone + Eq + for<'a> From<&'a str> + Hash,
+    KeyType: Clone + Default + Eq + for<'a> From<&'a str> + Hash,
 {
     #[inline]
     fn io_reader_callback<'a, EdgeIdType, VertexIdType>(&mut self, token: AttributeToken<'a>)
@@ -107,9 +107,10 @@ where
 
 
 pub trait Reader {
-    fn read_graph<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, file: &File, graph: &mut G) -> NexusArtResult<()>
+    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> NexusArtResult<G>
     where
         G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+        R: Read,
         EdgeAttributeCollectionType: AttributeCollectionIO,
         EdgeIdType: Id,
         VertexAttributeCollectionType: AttributeCollectionIO,
@@ -133,7 +134,9 @@ enum SupportedFormats {
 
 
 pub trait IO {
-    fn from_file(&mut self, file_name: &str) -> NexusArtResult<()>;
+    fn from_file(file_name: &str) -> NexusArtResult<Self>
+    where
+        Self: Sized;
     fn into_file(&self, file_name: &str) -> NexusArtResult<()>;
 }
 
@@ -148,28 +151,27 @@ where
     VertexAttributeCollectionType: AttributeCollectionIO,
     VertexIdType: FromStr + Id + Into<usize>,
 {
-    fn from_file(&mut self, file_name: &str) -> NexusArtResult<()> {
+    fn from_file(file_name: &str) -> NexusArtResult<Self> {
         const FUNCTION_PATH: &str = "Graph::IO::from_file";
         let file_format: SupportedFormats;
         if file_name.to_lowercase().ends_with(".gnbs") {
             file_format = SupportedFormats::GNBS;
         } else {
-            return Err(NexusArtError::new(FUNCTION_PATH, format!("Unsupported format of the file with name {}", file_name)));
+            return Err(NexusArtError::new(FUNCTION_PATH, format!("Unsupported format of the file with name '{}'.", file_name)));
         }
         let file = match File::open(file_name) {
             Ok(value) => value,
-            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Failed to open the file with name {}", file_name))),
+            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Failed to open the file with name '{}'.", file_name))),
         };
+        let buffer_reader = BufReader::new(file);
         match file_format {
             SupportedFormats::GNBS => {
-                GNBSReader.read_graph(&file, self)?;
+                GNBSReader.read_graph(buffer_reader)
             },
         }
-        Ok(())
     }
 
     fn into_file(&self, file_name: &str) -> NexusArtResult<()> {
         todo!();
     }
 }
-
