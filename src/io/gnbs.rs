@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display, io::{BufRead, BufReader, Read}, str::FromStr};
 use regex::Regex;
 use crate::{
-    BasicMutableGraph, Id, NexusArtError, NexusArtResult, StaticDispatchAttributeValue
+    BasicMutableGraph, Id, CrabNetsError, CrabNetsResult, StaticDispatchAttributeValue
 };
 use super::{AttributeCollectionIO, AttributeToken, Reader};
 
@@ -117,7 +117,7 @@ enum DocumentState {
 
 
 
-fn identify_atomic_value_type(value: &str, line_number: usize) -> NexusArtResult<Token> {
+fn identify_atomic_value_type(value: &str, line_number: usize) -> CrabNetsResult<Token> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     let integer_regex = Regex::new(r"^[+-]?(0|[1-9][0-9]*)$").unwrap();
     let float_regex = Regex::new(r"^[+-]?[0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?$").unwrap();
@@ -130,12 +130,12 @@ fn identify_atomic_value_type(value: &str, line_number: usize) -> NexusArtResult
     } else if value == "T" || value == "F" {
         Token::Boolean(value)
     } else {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value, found '{}'.", line_number, value)));
+        return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value, found '{}'.", line_number, value)));
     };
     Ok(token)
 }
 
-fn extract_declaration_specifier(line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
+fn extract_declaration_specifier(line: &str, line_number: usize) -> CrabNetsResult<(Token, &str, TokeniserState)> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     let mut split = line.trim_start().splitn(2, char::is_whitespace);
     let target = split.next().unwrap();
@@ -146,7 +146,7 @@ fn extract_declaration_specifier(line: &str, line_number: usize) -> NexusArtResu
         "E" => DeclarationSpecifierName::E,
         "A" => DeclarationSpecifierName::A,
         "#" | "" => DeclarationSpecifierName::Comment,
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected declaration specifier, found '{}'.", line_number, target))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected declaration specifier, found '{}'.", line_number, target))),
     };
     let next_state = match declaration_specifier {
         DeclarationSpecifierName::AV | DeclarationSpecifierName::AE => TokeniserState::ExpectingTypeName,
@@ -156,7 +156,7 @@ fn extract_declaration_specifier(line: &str, line_number: usize) -> NexusArtResu
     Ok((Token::DeclarationSpecifier(declaration_specifier), split.next().unwrap_or("").trim_start(), next_state))
 }
 
-fn extract_type_name(line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
+fn extract_type_name(line: &str, line_number: usize) -> CrabNetsResult<(Token, &str, TokeniserState)> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     let mut split = line.trim_start().splitn(2, char::is_whitespace);
     let target = split.next().unwrap();
@@ -195,16 +195,16 @@ fn extract_type_name(line: &str, line_number: usize) -> NexusArtResult<(Token, &
         "CU8" => GNBSAttributeType::CU8,
         "CB" => GNBSAttributeType::CB,
         "CS" => GNBSAttributeType::CS,
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected type name, found '{}'.", line_number, target))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected type name, found '{}'.", line_number, target))),
     };
     Ok((Token::AttributeType(type_name), split.next().unwrap_or(""), TokeniserState::ExpectingAttributeName))
 }
 
-fn extract_attribute_name(line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
+fn extract_attribute_name(line: &str, line_number: usize) -> CrabNetsResult<(Token, &str, TokeniserState)> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     let target = line.trim_start();
     if target == "" {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected attribute name, found ''.", line_number)));
+        return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected attribute name, found ''.", line_number)));
     }
     Ok((Token::String(target), "", TokeniserState::Terminated))
 }
@@ -242,7 +242,7 @@ fn split_complex_literal_into_atomics(values: &str) -> Vec<&str> {
     answer
 }
 
-fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &str, TokeniserState)> {
+fn extract_value(mut line: &str, line_number: usize) -> CrabNetsResult<(Token, &str, TokeniserState)> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     line = line.trim_start();
     let token: Token;
@@ -250,7 +250,7 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
         Some('"') => {
             let split = match line.get(1..).unwrap().split_once('"') {
                 Some(value) => value,
-                None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Closing quotation mark (\") wasn't found for a string value.", line_number))),
+                None => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Closing quotation mark (\") wasn't found for a string value.", line_number))),
             };
             token = Token::String(split.0);
             split.1.trim_start()
@@ -258,24 +258,24 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
         Some('[') => {
             let split = match line.get(1..).unwrap().split_once(']') {
                 Some(value) => value,
-                None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (]) wasn't found for a list value.", line_number))),
+                None => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (]) wasn't found for a list value.", line_number))),
             };
             let elements = split_complex_literal_into_atomics(split.0)
                 .into_iter()
                 .map(|x| Ok(extract_value(x.trim(), line_number)?.0))
-                .collect::<NexusArtResult<Vec<_>>>()?;
+                .collect::<CrabNetsResult<Vec<_>>>()?;
             token = Token::List(elements);
             split.1.trim_start()
         },
         Some('{') => {
             let split = match line.get(1..).unwrap().split_once('}') {
                 Some(value) => value,
-                None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (}}) wasn't found for a collection value.", line_number))),
+                None => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Closing bracket (}}) wasn't found for a collection value.", line_number))),
             };
             let elements = split_complex_literal_into_atomics(split.0)
                 .into_iter()
                 .map(|x| Ok(extract_value(x.trim(), line_number)?.0))
-                .collect::<NexusArtResult<Vec<_>>>()?;
+                .collect::<CrabNetsResult<Vec<_>>>()?;
             token = Token::Collection(elements);
             split.1.trim_start()
         },
@@ -285,7 +285,7 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
             token = identify_atomic_value_type(target, line_number)?;
             split.next().unwrap_or("").trim_start()
         },
-        None => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value, found '{}'.", line_number, line))),
+        None => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value, found '{}'.", line_number, line))),
     };
     let next_state = if remainder == "" {
         TokeniserState::Terminated
@@ -295,7 +295,7 @@ fn extract_value(mut line: &str, line_number: usize) -> NexusArtResult<(Token, &
     Ok((token, remainder, next_state))
 }
 
-fn tokenise_line(line: &str, line_number: usize) -> NexusArtResult<Vec<Token>> {
+fn tokenise_line(line: &str, line_number: usize) -> CrabNetsResult<Vec<Token>> {
     let mut answer: Vec<Token> = Vec::new();
     let mut state = TokeniserState::ExpectingDeclarationSpecifier;
     let mut new_token: Token;
@@ -313,7 +313,7 @@ fn tokenise_line(line: &str, line_number: usize) -> NexusArtResult<Vec<Token>> {
     Ok(answer)
 }
 
-fn parse_numeric_value<IntoType>(original_value: &str, value_type: &GNBSAttributeType, line_number: usize) -> NexusArtResult<IntoType>
+fn parse_numeric_value<IntoType>(original_value: &str, value_type: &GNBSAttributeType, line_number: usize) -> CrabNetsResult<IntoType>
 where
     IntoType: FromStr,
 {
@@ -321,7 +321,7 @@ where
     match original_value.parse::<IntoType>()
     {
         Ok(value) => Ok(value),
-        Err(_) => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, value_type, original_value))) 
+        Err(_) => Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, value_type, original_value))) 
     }
 }
 
@@ -330,7 +330,7 @@ macro_rules! convert_token_to_static_dispatch_attribute_value {
     (atomic value: $function_path: ident, $line_number: ident, $value: ident, $given_gnbs_value_type: ident, $($origin_gnbs_value_type: ident --> $target_static_dispatch_attribute_value_variant: ident),+) => {
         match $given_gnbs_value_type {
             $(GNBSAttributeType::$origin_gnbs_value_type => Ok(Some(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(parse_numeric_value($value, &$given_gnbs_value_type, $line_number)?))),)+
-            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
+            _ => Err(CrabNetsError::new($function_path, format!("Line {}. Expected value of type {}, found '{}'.", $line_number, $given_gnbs_value_type, $value))),
         }
     };
 
@@ -342,17 +342,17 @@ macro_rules! convert_token_to_static_dispatch_attribute_value {
                 for atomic_value_token in $value.iter() {
                     core_container.$target_core_container_insert_function(match parse_value(atomic_value_token.clone(), GNBSAttributeType::$atomic_gnbs_value_type, $line_number) {
                         Ok(Some(StaticDispatchAttributeValue::$atomic_static_dispatch_attribute_value_variant(atomic_value))) => atomic_value,
-                        _ => return Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
+                        _ => return Err(CrabNetsError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
                     });
                 }
                 Ok(Some(StaticDispatchAttributeValue::$target_static_dispatch_attribute_value_variant(core_container)))
             },)+
-            _ => Err(NexusArtError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
+            _ => Err(CrabNetsError::new($function_path, format!("Line {}. Expected value of type {}.", $line_number, $given_gnbs_value_type))),
         }
     };
 }
 
-fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: usize) -> NexusArtResult<Option<StaticDispatchAttributeValue>> {
+fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: usize) -> CrabNetsResult<Option<StaticDispatchAttributeValue>> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     match token {
         Token::Integer(value) => convert_token_to_static_dispatch_attribute_value!(
@@ -369,13 +369,13 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
             GNBSAttributeType::B => Ok(Some(StaticDispatchAttributeValue::Bool(match value {
                 "T" => true,
                 "F" => false,
-                _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type B, found '{}'.", line_number, value))),
+                _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value of type B, found '{}'.", line_number, value))),
             }))),
-            _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
+            _ => Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
         },
         Token::String(value) => match gnbs_value_type {
             GNBSAttributeType::S => Ok(Some(StaticDispatchAttributeValue::Str(value.to_string()))),
-            _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
+            _ => Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value of type {}, found '{}'.", line_number, gnbs_value_type, value))),
         },
         Token::List(value) => convert_token_to_static_dispatch_attribute_value!(
             complex value (Vec, push):
@@ -393,40 +393,40 @@ fn parse_value(token: Token, gnbs_value_type: GNBSAttributeType, line_number: us
             CB --[B --[bool]--> Bool]--> SetBool, CS --[S --[String]--> Str]--> SetStr
         ),
         Token::Empty => Ok(None),
-        _ => Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected value.", line_number))),
+        _ => Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected value.", line_number))),
     }
 }
 
-fn parse_attribute_declaration(tokens: Vec<Token>, line_number: usize) -> NexusArtResult<AttributeMetadata> {
+fn parse_attribute_declaration(tokens: Vec<Token>, line_number: usize) -> CrabNetsResult<AttributeMetadata> {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != 3 {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected attribute declaration in the form 'AV <type> <name>' or 'AE <type> <name>', found statement with {} token(s).", line_number, tokens.len())));
+        return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected attribute declaration in the form 'AV <type> <name>' or 'AE <type> <name>', found statement with {} token(s).", line_number, tokens.len())));
     }
     let type_name = match &tokens[1] {
         Token::AttributeType(value) => value.clone(),
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected type in the attribute declaration.", line_number))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected type in the attribute declaration.", line_number))),
     };
     let name = match tokens[2] {
         Token::String(value) => value.to_string(),
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected name in the attribute declaration.", line_number))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected name in the attribute declaration.", line_number))),
     };
     Ok(AttributeMetadata { name, gnbs_type: type_name })
 }
 
-fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<VertexMetadata<'a, VertexIdType>>
+fn parse_vertex_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> CrabNetsResult<VertexMetadata<'a, VertexIdType>>
 where
     VertexIdType: FromStr + Id,
 {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != attributes.len() + 2 {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
+        return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
     }
     let id: VertexIdType = match tokens[1] {
         Token::Integer(value) => match value.parse() {
             Ok(parsed_value) => parsed_value,
-            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+            Err(_) => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
         },
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
     };
     let mut attribute_tokens: Vec<AttributeToken> = Vec::with_capacity(attributes.len());
     for attribute_i in 0..attributes.len() {
@@ -440,27 +440,27 @@ where
     Ok(VertexMetadata { id, attribute_tokens })
 }
 
-fn parse_edge_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> NexusArtResult<EdgeMetadata<'a, VertexIdType>>
+fn parse_edge_declaration<'a, VertexIdType>(tokens: Vec<Token<'a>>, attributes: &'a Vec<AttributeMetadata>, line_number: usize) -> CrabNetsResult<EdgeMetadata<'a, VertexIdType>>
 where
     VertexIdType: FromStr + Id,
 {
     const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
     if tokens.len() != attributes.len() + 3 {
-        return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
+        return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex declaration in the form 'V <id> <attribute values>' with {} token(s) in <attribute values>, found statement with {} token(s) in total.", line_number, attributes.len(), tokens.len())));
     }
     let id1: VertexIdType = match tokens[1] {
         Token::Integer(value) => match value.parse() {
             Ok(parsed_value) => parsed_value,
-            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+            Err(_) => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
         },
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
     };
     let id2: VertexIdType = match tokens[2] {
         Token::Integer(value) => match value.parse() {
             Ok(parsed_value) => parsed_value,
-            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
+            Err(_) => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found {}.", line_number, value))),
         },
-        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
+        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Expected vertex ID, found token of non-integral type.", line_number))),
     };
     let mut attribute_tokens: Vec<AttributeToken> = Vec::with_capacity(attributes.len());
     for attribute_i in 0..attributes.len() {
@@ -490,7 +490,7 @@ pub struct GNBSReader;
 
 // GNBSReader::Reader
 impl<'a> Reader for GNBSReader {
-    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> NexusArtResult<G>
+    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> CrabNetsResult<G>
     where
         G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
         R: Read,
@@ -510,7 +510,7 @@ impl<'a> Reader for GNBSReader {
             let line = match line_result {
                 Ok(value) => value,
                 Err(_) => {
-                    return Err(NexusArtError::new(FUNCTION_PATH, format!("Couldn't read line {} of the input file.", line_number)));
+                    return Err(CrabNetsError::new(FUNCTION_PATH, format!("Couldn't read line {} of the input file.", line_number)));
                 },
             };
             let tokens = tokenise_line(line.as_ref(), line_number)?;
@@ -518,11 +518,11 @@ impl<'a> Reader for GNBSReader {
                 match declaration_specifier {
                     DeclarationSpecifierName::AV => match state {
                         DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex => vertex_attributes.push(parse_attribute_declaration(tokens, line_number)?),
-                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Vertex attribute declaration after a vertex declaration.", line_number))),
+                        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Vertex attribute declaration after a vertex declaration.", line_number))),
                     },
                     DeclarationSpecifierName::AE => match state {
                         DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => edge_attributes.push(parse_attribute_declaration(tokens, line_number)?),
-                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge attribute declaration after an edge declaration.", line_number))),
+                        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Edge attribute declaration after an edge declaration.", line_number))),
                     },
                     DeclarationSpecifierName::V => match state {
                         DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex | DocumentState::ExpectingVertexOrEdgeAttributeOrEdge => {
@@ -533,7 +533,7 @@ impl<'a> Reader for GNBSReader {
                                 new_graph.v_attrs_mut(&vertex_metadata.id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
                             }
                         },
-                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Vertex declaration after an edge declaration.", line_number))),
+                        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Vertex declaration after an edge declaration.", line_number))),
                     },
                     DeclarationSpecifierName::A => match state {
                         DocumentState::ExpectingVertexOrEdgeAttributeOrEdge | DocumentState::ExpectingEdge => {
@@ -544,7 +544,7 @@ impl<'a> Reader for GNBSReader {
                                 new_graph.e_attrs_mut(&edge_metadata.id1, &edge_metadata.id2, &edge_id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
                             }
                         },
-                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
+                        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
                     },
                     DeclarationSpecifierName::E => match state {
                         DocumentState::ExpectingVertexOrEdgeAttributeOrEdge | DocumentState::ExpectingEdge => {
@@ -555,7 +555,7 @@ impl<'a> Reader for GNBSReader {
                                 new_graph.e_attrs_mut(&edge_metadata.id1, &edge_metadata.id2, &edge_id).unwrap().io_reader_callback::<EdgeIdType, VertexIdType>(attribute_token);
                             }
                         },
-                        _ => return Err(NexusArtError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
+                        _ => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Line {}. Edge declaration before a vertex declaration.", line_number))),
                     },
                     DeclarationSpecifierName::Comment => (),
                 };

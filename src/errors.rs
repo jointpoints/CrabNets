@@ -10,7 +10,7 @@ use std::{error::Error, fmt::Display};
 
 
 
-pub type NexusArtResult<OkType> = Result<OkType, NexusArtError>;
+pub type CrabNetsResult<OkType> = Result<OkType, CrabNetsError>;
 
 
 
@@ -23,26 +23,26 @@ pub type NexusArtResult<OkType> = Result<OkType, NexusArtError>;
 
 
 #[derive(Debug)]
-pub struct NexusArtError {
+pub struct CrabNetsError {
     message: String,
 }
 
-// Implementation of NexusArtError
-impl NexusArtError {
+// Implementation of CrabNetsError
+impl CrabNetsError {
     pub fn new<StringType>(function_path: &str, message: StringType) -> Self
     where
         StringType: Into<String>
     {
-        NexusArtError{ message: format!("{}. {}", function_path, message.into()) }
+        CrabNetsError{ message: format!("{}. {}", function_path, message.into()) }
     }
 }
 
 // Implementation of Display
-impl Display for NexusArtError {
+impl Display for CrabNetsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("NexusArtError: {}", self.message).as_str())
+        f.write_str(format!("CrabNetsError: {}", self.message).as_str())
     }
 }
 
 // Implementation of Error
-impl Error for NexusArtError {}
+impl Error for CrabNetsError {}

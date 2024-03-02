@@ -23,7 +23,7 @@ pub mod gnbs;
 use std::{fs::File, hash::Hash, io::{BufReader, Read}, str::FromStr};
 use crate::{
     attribute::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue},
-    errors::{NexusArtError, NexusArtResult},
+    errors::{CrabNetsError, CrabNetsResult},
     DynamicDispatchAttributeMap,
     BasicMutableGraph,
     Graph,
@@ -107,7 +107,7 @@ where
 
 
 pub trait Reader {
-    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> NexusArtResult<G>
+    fn read_graph<G, R, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, buffer_reader: BufReader<R>) -> CrabNetsResult<G>
     where
         G: BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
         R: Read,
@@ -134,10 +134,10 @@ enum SupportedFormats {
 
 
 pub trait IO {
-    fn from_file(file_name: &str) -> NexusArtResult<Self>
+    fn from_file(file_name: &str) -> CrabNetsResult<Self>
     where
         Self: Sized;
-    fn into_file(&self, file_name: &str) -> NexusArtResult<()>;
+    fn into_file(&self, file_name: &str) -> CrabNetsResult<()>;
 }
 
 
@@ -151,17 +151,17 @@ where
     VertexAttributeCollectionType: AttributeCollectionIO,
     VertexIdType: FromStr + Id + Into<usize>,
 {
-    fn from_file(file_name: &str) -> NexusArtResult<Self> {
+    fn from_file(file_name: &str) -> CrabNetsResult<Self> {
         const FUNCTION_PATH: &str = "Graph::IO::from_file";
         let file_format: SupportedFormats;
         if file_name.to_lowercase().ends_with(".gnbs") {
             file_format = SupportedFormats::GNBS;
         } else {
-            return Err(NexusArtError::new(FUNCTION_PATH, format!("Unsupported format of the file with name '{}'.", file_name)));
+            return Err(CrabNetsError::new(FUNCTION_PATH, format!("Unsupported format of the file with name '{}'.", file_name)));
         }
         let file = match File::open(file_name) {
             Ok(value) => value,
-            Err(_) => return Err(NexusArtError::new(FUNCTION_PATH, format!("Failed to open the file with name '{}'.", file_name))),
+            Err(_) => return Err(CrabNetsError::new(FUNCTION_PATH, format!("Failed to open the file with name '{}'.", file_name))),
         };
         let buffer_reader = BufReader::new(file);
         match file_format {
@@ -171,7 +171,7 @@ where
         }
     }
 
-    fn into_file(&self, file_name: &str) -> NexusArtResult<()> {
+    fn into_file(&self, file_name: &str) -> CrabNetsResult<()> {
         todo!();
     }
 }

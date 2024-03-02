@@ -1,9 +1,9 @@
-//! <h2 id="nexusart" style="text-align: center; font-variant: small-caps"><a href="#nexusart">NexusArt</a></h2>
+//! <h2 id="crabnets" style="text-align: center; font-variant: small-caps"><a href="#crabnets">CrabNets</a></h2>
 //! 
 //! <div style="text-align: center"><b><i>Fast and flexible graph library for Rust</i></b></div>
 //! 
 //! ## Welcome!
-//! NexusArt is one of the few Rust libraries that enable developers to  build,  analyse
+//! CrabNets is one of the few Rust libraries that enable developers to  build,  analyse
 //! and manipulate graphs/networks.
 //! 
 //! ## Features
@@ -69,7 +69,7 @@ use std::{
     ops::AddAssign,
 };
 use attribute::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
-use errors::{NexusArtError, NexusArtResult};
+use errors::{CrabNetsError, CrabNetsResult};
 use locales::*;
 #[allow(unused_imports)]
 use private::ConditionalType;
@@ -237,22 +237,22 @@ where
     }
 
     #[inline]
-    fn v_degree(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree(&self, id: &T::VertexIdType) -> CrabNetsResult<usize> {
         self.unwrap().v_degree(id)
     }
 
     #[inline]
-    fn v_degree_in(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_in(&self, id: &T::VertexIdType) -> CrabNetsResult<usize> {
         self.unwrap().v_degree_in(id)
     }
 
     #[inline]
-    fn v_degree_out(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_out(&self, id: &T::VertexIdType) -> CrabNetsResult<usize> {
         self.unwrap().v_degree_out(id)
     }
 
     #[inline]
-    fn v_degree_undir(&self, id: &T::VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_undir(&self, id: &T::VertexIdType) -> CrabNetsResult<usize> {
         self.unwrap().v_degree_undir(id)
     }
 }
@@ -272,7 +272,7 @@ where
     T: Clone + MutableGraphContainer,
 {
     #[inline]
-    fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool, edge_id: Option<T::EdgeIdType>) -> NexusArtResult<T::EdgeIdType> {
+    fn add_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, directed: bool, edge_id: Option<T::EdgeIdType>) -> CrabNetsResult<T::EdgeIdType> {
         self.unwrap().add_e(id1, id2, directed, edge_id)
     }
 
@@ -282,12 +282,12 @@ where
     }
 
     #[inline]
-    fn e_attrs_mut(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> NexusArtResult<&mut T::EdgeAttributeCollectionType> {
+    fn e_attrs_mut(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> CrabNetsResult<&mut T::EdgeAttributeCollectionType> {
         self.unwrap().e_attrs_mut(id1, id2, edge_id)
     }
 
     #[inline]
-    fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> NexusArtResult<bool> {
+    fn remove_e(&mut self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> CrabNetsResult<bool> {
         self.unwrap().remove_e(id1, id2, edge_id)
     }
 
@@ -297,7 +297,7 @@ where
     }
 
     #[inline]
-    fn v_attrs_mut(&mut self, id: &T::VertexIdType) -> NexusArtResult<&mut T::VertexAttributeCollectionType> {
+    fn v_attrs_mut(&mut self, id: &T::VertexIdType) -> CrabNetsResult<&mut T::VertexAttributeCollectionType> {
         self.unwrap().v_attrs_mut(id)
     }
 }
@@ -404,8 +404,8 @@ where
     /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
-    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// * `CrabNetsResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
     /// ## Details
     /// This function counts  _all_  vertices  of  the  underlying  [`Graph`]  that  are
@@ -417,7 +417,7 @@ where
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// then each parallel edge will be counted separately.
-    fn v_degree(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    fn v_degree(&self, id: &VertexIdType) -> CrabNetsResult<usize>;
     /// # Vertex in-degree
     /// 
     /// ## Description
@@ -429,8 +429,8 @@ where
     /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Return
-    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
-    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// * `CrabNetsResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
     /// ## Details
     /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
@@ -438,7 +438,7 @@ where
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// then each parallel incoming edge will be counted separately.
-    fn v_degree_in(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    fn v_degree_in(&self, id: &VertexIdType) -> CrabNetsResult<usize>;
     /// # Vertex out-degree
     /// 
     /// ## Description
@@ -450,8 +450,8 @@ where
     /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Return
-    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
-    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// * `CrabNetsResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
     /// ## Details
     /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
@@ -459,7 +459,7 @@ where
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// then each parallel outcoming edge will be counted separately.
-    fn v_degree_out(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    fn v_degree_out(&self, id: &VertexIdType) -> CrabNetsResult<usize>;
     /// # Vertex undirected degree
     /// 
     /// ## Description
@@ -471,8 +471,8 @@ where
     /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Return
-    /// * `NexusArtResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
-    /// exists; `Err(NexusArtError)` is returned otherwise.
+    /// * `CrabNetsResult<usize>` - `Ok(usize)` is returned when the vertex with ID `id`
+    /// exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
     /// ## Details
     /// If the underlying [`Graph`] `g` is [undirected](Graph#different-kinds-of-graphs),
@@ -480,7 +480,7 @@ where
     /// 
     /// If the underlying [`Graph`] is a [multi-graph](Graph#different-kinds-of-graphs),
     /// then each parallel undirected edge will be counted separately.
-    fn v_degree_undir(&self, id: &VertexIdType) -> NexusArtResult<usize>;
+    fn v_degree_undir(&self, id: &VertexIdType) -> CrabNetsResult<usize>;
 }
 
 
@@ -519,8 +519,8 @@ where
     /// automatically.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<EdgeIdType>` - `Ok(value)` is returned when the edge was added
-    /// successfully with `value` being the ID of the new edge; `Err(NexusArtError)`  is
+    /// * `CrabNetsResult<EdgeIdType>` - `Ok(value)` is returned when the edge was added
+    /// successfully with `value` being the ID of the new edge; `Err(CrabNetsError)`  is
     /// returned when at least 1 of the vertices `id1` and `id2` doesn't exist.
     /// 
     /// ## Details
@@ -545,7 +545,7 @@ where
     /// [attrs]: Graph#attributes
     /// [details]: #details
     /// [kinds]: Graph#different-kinds-of-graphs
-    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> NexusArtResult<EdgeIdType>;
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> CrabNetsResult<EdgeIdType>;
     /// # Add vertex
     /// 
     /// ## Description
@@ -583,8 +583,8 @@ where
     /// be retrieved.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<&mut EdgeAttributeCollectionType>` - `Ok(value)`  is  returned
-    /// if the given edge exists; `Err(NexusArtError)` is returned otherwise.
+    /// * `CrabNetsResult<&mut EdgeAttributeCollectionType>` - `Ok(value)`  is  returned
+    /// if the given edge exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
     /// <div id="get-e-attrs-mut-details" style="margin-top: -15px;">
     /// 
@@ -600,7 +600,7 @@ where
     /// 
     /// [Details]: #get-e-attrs-mut-details
     /// [kinds]: Graph#different-kinds-of-graphs
-    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<&mut EdgeAttributeCollectionType>;
+    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&mut EdgeAttributeCollectionType>;
     /// # Remove edge
     /// 
     /// ## Description
@@ -616,9 +616,9 @@ where
     /// edge between `id1` and `id2` with ID `edge_id` will be removed.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<bool>` - `Ok(value)` is returned if the edge was  successfully
+    /// * `CrabNetsResult<bool>` - `Ok(value)` is returned if the edge was  successfully
     /// deleted or if it didn't exist: Boolean `value` shows whether  the  edge  existed
-    /// when this function was called; `Err(NexusArtError)` is returned when at least  1
+    /// when this function was called; `Err(CrabNetsError)` is returned when at least  1
     /// of the vertices `id1` and `id2` doesn't exist.
     /// 
     /// <div id="remove-e-details" style="margin-top: -15px;">
@@ -635,7 +635,7 @@ where
     /// 
     /// [Details]: #remove-e-details
     /// [kinds]: Graph#different-kinds-of-graphs
-    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool>;
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<bool>;
     /// # Remove vertex
     /// 
     /// ## Description
@@ -660,12 +660,12 @@ where
     /// * `id` : `VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Returns
-    /// * `NexusArtResult<&mut VertexAttributeCollectionType>` - `Ok(value)` is returned
-    /// if the vertex  with  the  given  ID  exists;  `Err(NexusArtError)`  is  returned
+    /// * `CrabNetsResult<&mut VertexAttributeCollectionType>` - `Ok(value)` is returned
+    /// if the vertex  with  the  given  ID  exists;  `Err(CrabNetsError)`  is  returned
     /// otherwise.
     /// 
     /// [attrs]: attribute::AttributeCollection
-    fn v_attrs_mut(&mut self, id: &VertexIdType) -> NexusArtResult<&mut VertexAttributeCollectionType>;
+    fn v_attrs_mut(&mut self, id: &VertexIdType) -> CrabNetsResult<&mut VertexAttributeCollectionType>;
 }
 
 
@@ -691,10 +691,10 @@ where
 /// pair of edges connecting the same pair of vertices will be called **parallel**.
 /// 
 /// Each graph can be assigned with one label from  the  first  classification  and  one
-/// label from the second classification, thus making 4 possible combinations.  NexusArt
+/// label from the second classification, thus making 4 possible combinations.  CrabNets
 /// supports all of them.
 /// 
-/// Furthermore,  NexusArt  implements  certain  optimisations   for   each   of   these
+/// Furthermore,  CrabNets  implements  certain  optimisations   for   each   of   these
 /// combinations, hence, it makes sense for you to carefully evaluate which exactly kind
 /// of graphs you're going to be dealing in your program with to enjoy the best possible
 /// performance you can get.
@@ -765,38 +765,38 @@ where
     }
 
     #[inline]
-    fn v_degree(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree";
         match self.edge_list.get(id) {
             Some(value) => Ok(value.count_neighbours()),
-            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
 
     #[inline]
-    fn v_degree_in(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_in(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_in";
         match self.edge_list.get(id) {
             Some(value) => Ok(value.count_neighbours_in()),
-            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
 
     #[inline]
-    fn v_degree_out(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_out(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_out";
         match self.edge_list.get(id) {
             Some(value) => Ok(value.count_neighbours_out()),
-            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
 
     #[inline]
-    fn v_degree_undir(&self, id: &VertexIdType) -> NexusArtResult<usize> {
+    fn v_degree_undir(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_undir";
         match self.edge_list.get(id) {
             Some(value) => Ok(value.count_neighbours_undir()),
-            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
 }
@@ -810,7 +810,7 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
-    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> NexusArtResult<EdgeIdType> {
+    fn add_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, directed: bool, edge_id: Option<EdgeIdType>) -> CrabNetsResult<EdgeIdType> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::add_e";
         if self.contains_v(id1) {
             if self.contains_v(id2) {
@@ -832,10 +832,10 @@ where
                     }, Some(actual_edge_id.clone()));
                 Ok(actual_edge_id)
             } else {
-                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+                Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
             }
         } else {
-            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
     }
 
@@ -857,7 +857,7 @@ where
         return_value
     }
 
-    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<&mut EdgeAttributeCollectionType> {
+    fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&mut EdgeAttributeCollectionType> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::e_attrs_mut";
         if self.edge_list.contains_key(id1) {
             if self.edge_list.contains_key(id2) {
@@ -867,27 +867,27 @@ where
                         EdgeDirection::Directed1to2 => Ok(self.edge_list.get_mut(id1).unwrap().e_attrs_mut(id2, edge_id)),
                         EdgeDirection::Directed2to1 => Ok(self.edge_list.get_mut(id2).unwrap().e_attrs_mut(id1, edge_id)),
                     },
-                    None => Err(NexusArtError::new(FUNCTION_PATH, format!("Accessing attributes of a non-existing edge between vertices {} and {} with edge ID {}.", id1, id2, edge_id))),
+                    None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Accessing attributes of a non-existing edge between vertices {} and {} with edge ID {}.", id1, id2, edge_id))),
                 }
             } else {
-                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+                Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
             }
         } else {
-            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
     }
 
-    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> NexusArtResult<bool> {
+    fn remove_e(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<bool> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::delete_e";
         if self.edge_list.contains_key(id1) {
             if self.edge_list.contains_key(id2) {
                 self.edge_list.get_mut(id1).unwrap().remove_e(id2, edge_id);
                 Ok(self.edge_list.get_mut(id2).unwrap().remove_e(id1, edge_id))
             } else {
-                Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+                Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
             }
         } else {
-            Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
     }
 
@@ -905,11 +905,11 @@ where
         true
     }
 
-    fn v_attrs_mut(&mut self, id: &VertexIdType) -> NexusArtResult<&mut VertexAttributeCollectionType> {
+    fn v_attrs_mut(&mut self, id: &VertexIdType) -> CrabNetsResult<&mut VertexAttributeCollectionType> {
         const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::v_attrs_mut";
         match self.edge_list.get_mut(id) {
             Some(value) => Ok(value.v_attrs_mut()),
-            None => Err(NexusArtError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
         }
     }
 }
@@ -959,13 +959,13 @@ macro_rules! graph_type_recognition_assistant {
 /// There's one feature of [`Graph`] that comes both as a blessing and a curse:  it's  a
 /// generic type. [`Graph`] accepts multiple type parameters that have to  be  specified
 /// by you in a very specific order every time you create a  new  instance.  This  helps
-/// NexusArt to maintain its flexibility and allows you to adjust the  functionality  of
+/// CrabNets to maintain its flexibility and allows you to adjust the  functionality  of
 /// your networks for your specific needs, however, it comes at its own cost of  tedious
 /// enumeration of all the necessary type parameters, which names, of course, are  never
 /// remembered and have to be looked up in the documentation.
 /// 
 /// This macro was created to avoid it as much as possible. With the help of `graph!()`,
-/// you can easily create all possible kinds of  graphs  NexusArt  has  to  offer  while
+/// you can easily create all possible kinds of  graphs  CrabNets  has  to  offer  while
 /// keeping your code clean and aesthetically appealing.
 /// 
 /// ## Basic use
@@ -981,7 +981,7 @@ macro_rules! graph_type_recognition_assistant {
 /// The first _and_ the last token symbolise vertices of our network  and  show  whether
 /// they'll have any [attributes](Graph#attributes) or not.  Value  '`X`'  serves  as  a
 /// marker which says: 'We'll _never_ try to store  or  access  any  attributes  of  any
-/// vertex of the graph'. Needless to say, this allows NexusArt to optimise memory usage
+/// vertex of the graph'. Needless to say, this allows CrabNets to optimise memory usage
 /// as we know in advance that there'll be no need to even declare attribute collections
 /// for any of the vertices.
 /// 
