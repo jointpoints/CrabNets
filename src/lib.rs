@@ -212,7 +212,7 @@ where
 }
 
 // <T:ImmutableGraphContainer>::BasicImmutableGraph
-impl<T> BasicImmutableGraph<T::EdgeIdType, T::VertexIdType> for T
+impl<T> BasicImmutableGraph<T::EdgeAttributeCollectionType, T::EdgeIdType, T::VertexAttributeCollectionType, T::VertexIdType> for T
 where
     T: Clone + ImmutableGraphContainer,
 {
@@ -234,6 +234,16 @@ where
     #[inline]
     fn count_v(&self) -> usize {
         self.unwrap().count_v()
+    }
+
+    #[inline]
+    fn e_attrs(&self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> CrabNetsResult<&T::EdgeAttributeCollectionType> {
+        self.unwrap().e_attrs(id1, id2, edge_id)
+    }
+
+    #[inline]
+    fn v_attrs(&self, id: &T::VertexIdType) -> CrabNetsResult<&T::VertexAttributeCollectionType> {
+        self.unwrap().v_attrs(id)
     }
 
     #[inline]
@@ -320,10 +330,12 @@ where
 /// 
 /// This  trait  is  implemented  for   [`Graph`]   and   any   type   that   implements
 /// [`ImmutableGraphContainer`].
-pub trait BasicImmutableGraph<EdgeIdType, VertexIdType>
+pub trait BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>
 where
     Self: Clone + Default,
+    EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
     /// # Check existence of edge
@@ -394,6 +406,58 @@ where
     /// ## Returns
     /// * `usize` - the number of vertices in the graph.
     fn count_v(&self) -> usize;
+    /// # Immutable reference to edge attributes
+    /// ## Description
+    /// Get an immutable reference to the [attribute collection][attrs] of the specified
+    /// edge.
+    ///
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id1` : `&VertexIdType` - an immutable  reference  to  the  ID  of  the  first
+    /// vertex.
+    /// * `id2` : `&VertexIdType` - an immutable reference  to  the  ID  of  the  second
+    /// vertex.
+    /// * `edge_id` : `&EdgeIdType` - if edge IDs are supported (see [Details]), then an
+    /// attribute collection of the edge between `id1` and `id2` with ID `edge_id`  will
+    /// be retrieved.
+    /// 
+    /// ## Returns
+    /// * `CrabNetsResult<&EdgeAttributeCollectionType>` - `Ok(value)`  is  returned  if
+    /// given edge exists; `Err(CrabNetsError)` is returned otherwise.
+    /// 
+    /// <div id="e-attrs-details" style="margin-top: -15px;">
+    /// 
+    /// ## Details
+    /// 
+    /// </div>
+    /// 
+    /// Even if the edge with ID `edge_id` is directed, the order of  values  `id1`  and
+    /// `id2` doesn't matter.
+    /// 
+    /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
+    /// ignored as simple graphs don't support edge IDs.
+    /// 
+    /// [attrs]: attribute::AttributeCollection
+    /// [Details]: #e-attrs-details
+    /// [kinds]: Graph#different-kinds-of-graphs
+    fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType>;
+    /// # Immutable reference to vertex attributes
+    /// 
+    /// ## Description
+    /// Get an immutable reference to the [attribute collection][attrs] of the specified
+    /// vertex.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// * `CrabNetsResult<&VertexAttributeCollectionType>` - `Ok(value)` is returned  if
+    /// the  vertex  with  the  given  ID  exists;  `Err(CrabNetsError)`   is   returned
+    /// otherwise.
+    /// 
+    /// [attrs]: attribute::AttributeCollection
+    fn v_attrs(&self, id: &VertexIdType) -> CrabNetsResult<&VertexAttributeCollectionType>;
     /// # Vertex degree
     /// 
     /// ## Description
@@ -494,7 +558,7 @@ where
 /// [`MutableGraphContainer`].
 pub trait BasicMutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>
 where
-    Self: BasicImmutableGraph<EdgeIdType, VertexIdType>,
+    Self: BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
     EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
     VertexAttributeCollectionType: AttributeCollection,
@@ -567,10 +631,10 @@ where
     /// 
     /// [attrs]: Graph#attributes
     fn add_v(&mut self, id: Option<VertexIdType>) -> VertexIdType;
-    /// # Get a mutable reference to edge attributes
+    /// # Mutable reference to edge attributes
     /// ## Description
     /// Get a mutable reference to the [attribute collection][attrs]  of  the  specified
-    /// vertex.
+    /// edge.
     ///
     /// ## Arguments
     /// * `&mut self` - a mutable reference to the caller.
@@ -586,7 +650,7 @@ where
     /// * `CrabNetsResult<&mut EdgeAttributeCollectionType>` - `Ok(value)`  is  returned
     /// if the given edge exists; `Err(CrabNetsError)` is returned otherwise.
     /// 
-    /// <div id="get-e-attrs-mut-details" style="margin-top: -15px;">
+    /// <div id="e-attrs-mut-details" style="margin-top: -15px;">
     /// 
     /// ## Details
     /// 
@@ -598,7 +662,8 @@ where
     /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
     /// ignored as simple graphs don't support edge IDs.
     /// 
-    /// [Details]: #get-e-attrs-mut-details
+    /// [attrs]: attribute::AttributeCollection
+    /// [Details]: #e-attrs-mut-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&mut EdgeAttributeCollectionType>;
     /// # Remove edge
@@ -730,7 +795,7 @@ where
 }
 
 // Graph::BasicImmutableGraph
-impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> BasicImmutableGraph<EdgeIdType, VertexIdType> for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
@@ -759,9 +824,38 @@ where
     fn count_e(&self) -> usize {
         let mut answer: usize = 0;
         for (_, locale) in self.edge_list.iter() {
-            answer += locale.count_neighbours();
+            answer += locale.count_incident_e();
         }
         answer / 2
+    }
+
+    fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType> {
+        const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::e_attrs_mut";
+        if self.edge_list.contains_key(id1) {
+            if self.edge_list.contains_key(id2) {
+                match self.contains_e(id1, id2, edge_id) {
+                    Some(value) => match value {
+                        EdgeDirection::Undirected => Ok(self.edge_list.get(if id1 <= id2 { id1 } else { id2 }).unwrap().e_attrs(if id1 <= id2 { id2 } else { id1 }, edge_id).unwrap()),
+                        EdgeDirection::Directed1to2 => Ok(self.edge_list.get(id1).unwrap().e_attrs(id2, edge_id).unwrap()),
+                        EdgeDirection::Directed2to1 => Ok(self.edge_list.get(id2).unwrap().e_attrs(id1, edge_id).unwrap()),
+                    },
+                    None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Accessing attributes of a non-existing edge between vertices {} and {} with edge ID {}.", id1, id2, edge_id))),
+                }
+            } else {
+                Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
+            }
+        } else {
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
+        }
+    }
+
+    #[inline]
+    fn v_attrs(&self, id: &VertexIdType) -> CrabNetsResult<&VertexAttributeCollectionType> {
+        const FUNCTION_PATH: &str = "Graph::BasicMutableGraph::v_attrs_mut";
+        match self.edge_list.get(id) {
+            Some(value) => Ok(value.v_attrs()),
+            None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
     }
 
     #[inline]
@@ -821,7 +915,7 @@ where
                         EdgeToVertexRelation::Outcoming
                     } else {
                         EdgeToVertexRelation::Undirected
-                    }, edge_id);
+                    }, edge_id, directed || id1 <= id2);
                 self.edge_list
                     .get_mut(id2)
                     .unwrap()
@@ -829,7 +923,7 @@ where
                         EdgeToVertexRelation::Incoming
                     } else {
                         EdgeToVertexRelation::Undirected
-                    }, Some(actual_edge_id.clone()));
+                    }, Some(actual_edge_id.clone()), !directed && id2 <= id1);
                 Ok(actual_edge_id)
             } else {
                 Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id2)))
@@ -863,9 +957,9 @@ where
             if self.edge_list.contains_key(id2) {
                 match self.contains_e(id1, id2, edge_id) {
                     Some(value) => match value {
-                        EdgeDirection::Undirected => Ok(self.edge_list.get_mut(if id1 <= id2 { id1 } else { id2 }).unwrap().e_attrs_mut(if id1 <= id2 { id2 } else { id1 }, edge_id)),
-                        EdgeDirection::Directed1to2 => Ok(self.edge_list.get_mut(id1).unwrap().e_attrs_mut(id2, edge_id)),
-                        EdgeDirection::Directed2to1 => Ok(self.edge_list.get_mut(id2).unwrap().e_attrs_mut(id1, edge_id)),
+                        EdgeDirection::Undirected => Ok(self.edge_list.get_mut(if id1 <= id2 { id1 } else { id2 }).unwrap().e_attrs_mut(if id1 <= id2 { id2 } else { id1 }, edge_id).unwrap()),
+                        EdgeDirection::Directed1to2 => Ok(self.edge_list.get_mut(id1).unwrap().e_attrs_mut(id2, edge_id).unwrap()),
+                        EdgeDirection::Directed2to1 => Ok(self.edge_list.get_mut(id2).unwrap().e_attrs_mut(id1, edge_id).unwrap()),
                     },
                     None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Accessing attributes of a non-existing edge between vertices {} and {} with edge ID {}.", id1, id2, edge_id))),
                 }
@@ -926,6 +1020,7 @@ where
 
 #[derive(Clone, Copy)]
 pub enum GraphProperty{
+    EdgeAttributeCollectionType,
     EdgeIdType,
     VertexAttributeCollectionType,
     VertexIdType,
@@ -1004,24 +1099,24 @@ macro_rules! graph {
     (X ---X--- X with $($property:path = $value:ty),+) => {
         {
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<(), u8, UndirectedSimpleUnattributedLocale<(), VertexIdType>, (), VertexIdType>::new()
+            Graph::<(), u8, UndirectedSimpleLocale<(), (), VertexIdType>, (), VertexIdType>::new()
         }
     };
 
     (X ---X--- X) => {
-        Graph::<(), u8, UndirectedSimpleUnattributedLocale<(), usize>, (), usize>::new()
+        Graph::<(), u8, UndirectedSimpleLocale<(), (), usize>, (), usize>::new()
     };
 
     (A ---X--- A with $($property:path = $value:ty),+) => {
         {
             type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>);
             type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<(), u8, UndirectedSimpleUnattributedLocale<VertexAttributeCollectionType, VertexIdType>, VertexAttributeCollectionType, VertexIdType>::new()
+            Graph::<(), u8, UndirectedSimpleLocale<(), VertexAttributeCollectionType, VertexIdType>, VertexAttributeCollectionType, VertexIdType>::new()
         }
     };
 
     (A ---X--- A) => {
-        Graph::<(), u8, UndirectedSimpleUnattributedLocale<DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>::new()
+        Graph::<(), u8, UndirectedSimpleLocale<(), DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>::new()
     };
 }
 

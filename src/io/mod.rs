@@ -4,7 +4,7 @@
 //! This module contains items that enable users to read/write graphs from/to files. The
 //! main component of the module that most users will most often interact  with  is  the
 //! [`IO`] trait that defines 2 functions: [`IO::from_file`] and [`IO::into_file`]. This
-//! trait is  implemented  for  [`Graph`][graph],  [`ImmutableGraphContainer`][igc]  and
+//! trait   is   implemented   for   [`Graph`],   [`ImmutableGraphContainer`][igc]   and
 //! [`MutableGraphContainer`][mgc].
 //! 
 //! ## Supported formats
@@ -15,7 +15,6 @@
 //! * GEXF
 //! * GR
 //! 
-//! [graph]: crate::Graph
 //! [igc]: crate::ImmutableGraphContainer
 //! [mgc]: crate::MutableGraphContainer
 pub mod gnbs;
