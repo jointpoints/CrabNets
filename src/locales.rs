@@ -5,7 +5,7 @@ use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Edg
 
 
 
-/// # Vertex together with its neighbours
+/// # Vertex and edges incident on it
 /// 
 /// ## Description
 /// This trait defines an interface for **locales**. Locales  are  typically  associated
@@ -308,10 +308,119 @@ where
     /// information about all undirected edges incident on the  vertex  associated  with
     /// this locale.
     fn incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
+    /// # Iterate over incident edges
+    /// 
+    /// ## Description
+    /// Iterate over all edges in this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// iterator over all edges incident on the vertex associated with this locale.
+    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
+    /// # Iterate over incoming incident edges
+    /// 
+    /// ## Description
+    /// Iterate over all incoming edges in this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// iterator over all incoming edges incident on the  vertex  associated  with  this
+    /// locale.
+    fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
+    /// # Iterate over outgoing incident edges
+    /// 
+    /// ## Description
+    /// Iterate over all outgoing edges in this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// iterator over all outgoing edges incident on the  vertex  associated  with  this
+    /// locale.
+    fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
+    /// # Iterate over undirected incident edges
+    /// 
+    /// ## Description
+    /// Iterate over all undirected edges in this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// iterator over all undirected edges incident on the vertex associated  with  this
+    /// locale.
+    fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
+    /// # Iterate over neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices adjacent to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>`  -  an  iterator  over  all  adjacent
+    /// vertices.
     fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'incoming' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a source of at least one  directed  edge
+    /// connecting them to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'incoming'
+    /// adjacent vertices.
     fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'outgoing' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a target of at least one  directed  edge
+    /// connecting them to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'outgoing'
+    /// adjacent vertices.
     fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'undirected' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that are connected to the vertex associated with  this
+    /// locale by at least one undirected edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an iterator over  all  'undirected'
+    /// adjacent vertices.
     fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn new() -> Self;
     fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
@@ -449,7 +558,43 @@ where
     }
 
     #[inline]
-    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
+    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
+        Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
+            direction: EdgeDirection::Undirected,
+            edge_id: EdgeIdType::default(),
+            id1: VertexIdType::default(),
+            id2: id2.clone(),
+        }))
+    }
+
+    #[inline]
+    fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
+        Box::new(empty())
+    }
+
+    #[inline]
+    fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
+        Box::new(empty())
+    }
+
+    #[inline]
+    fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
@@ -465,12 +610,12 @@ where
 
     #[inline]
     fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(empty::<VertexIdType>())
+        Box::new(empty())
     }
 
     #[inline]
     fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
-        Box::new(empty::<VertexIdType>())
+        Box::new(empty())
     }
 
     #[inline]
