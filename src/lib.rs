@@ -927,7 +927,7 @@ where
                     .get_mut(id1)
                     .unwrap()
                     .add_e(id2.clone(), if directed {
-                        EdgeToVertexRelation::Outcoming
+                        EdgeToVertexRelation::Outgoing
                     } else {
                         EdgeToVertexRelation::Undirected
                     }, edge_id, directed || id1 <= id2);
@@ -1004,7 +1004,7 @@ where
         if !self.edge_list.contains_key(id) {
             return false;
         }
-        for edge in self.edge_list[id].incident_e() {
+        for edge in self.edge_list[id].iter_incident_e().collect::<Vec<_>>() {
             self.remove_e(&edge.id1, &edge.id2, &edge.edge_id).unwrap();
         }
         self.edge_list.remove(id);
@@ -1045,17 +1045,17 @@ pub enum GraphProperty{
 
 #[allow(unused_macros)]
 macro_rules! graph_type_recognition_assistant {
-    ([$first_property:path = $first_value:ty, $($property:path = $value:ty),+], $required_property:path, $default_value:ty) => {
+    ([$first_property:ident = $first_value:ty, $($property:ident = $value:ty),+], $required_property:ident, $default_value:ty) => {
         ConditionalType<
-            {($first_property as u8) == ($required_property as u8)},
+            {(GraphProperty::$first_property as u8) == (GraphProperty::$required_property as u8)},
             $first_value,
             graph_type_recognition_assistant!([$($property = $value),+], $required_property, $default_value)
         >
     };
 
-    ([$last_property:path = $last_value:ty], $required_property:path, $default_value:ty) => {
+    ([$last_property:ident = $last_value:ty], $required_property:ident, $default_value:ty) => {
         ConditionalType<
-            {($last_property as u8) == ($required_property as u8)},
+            {(GraphProperty::$last_property as u8) == (GraphProperty::$required_property as u8)},
             $last_value,
             $default_value
         >
@@ -1083,7 +1083,7 @@ macro_rules! graph_type_recognition_assistant {
 /// there.
 /// 
 /// ```
-/// let g = graph!(X ===A==> X);
+/// let g: graph!(X ===A==> X) = Graph::new();
 /// ```
 /// 
 /// Here, we have 3 tokens separated by whitespaces: '`X`', '`===A==>`' and '`X`'.
@@ -1111,27 +1111,164 @@ macro_rules! graph_type_recognition_assistant {
 /// have attributes stored in them.
 #[macro_export]
 macro_rules! graph {
-    (X ---X--- X with $($property:path = $value:ty),+) => {
-        {
-            type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<(), u8, UndirectedSimpleLocale<(), (), VertexIdType>, (), VertexIdType>::new()
-        }
+    (X ---X--- X with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
     };
 
     (X ---X--- X) => {
-        Graph::<(), u8, UndirectedSimpleLocale<(), (), usize>, (), usize>::new()
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ usize
+        >
     };
 
-    (A ---X--- A with $($property:path = $value:ty),+) => {
-        {
-            type VertexAttributeCollectionType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>);
-            type VertexIdType = graph_type_recognition_assistant!([$($property = $value),+], GraphProperty::VertexIdType, usize);
-            Graph::<(), u8, UndirectedSimpleLocale<(), VertexAttributeCollectionType, VertexIdType>, VertexAttributeCollectionType, VertexIdType>::new()
-        }
+    (A ---X--- A with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
     };
 
     (A ---X--- A) => {
-        Graph::<(), u8, UndirectedSimpleLocale<(), DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>::new()
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
+            /* VertexIdType */ usize
+        >
+    };
+
+    (X ---A--- X with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (X ---A--- X) => {
+        Graph<
+            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ usize
+        >
+    };
+
+    (A ---A--- A with $($properties:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (A ---A--- A) => {
+        Graph<
+            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeIdType */ u8,
+            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
+            /* VertexIdType */ usize
+        >
+    };
+
+    (X ---X--> X with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (X ---X--> X) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ usize
+        >
+    };
+
+    (A ---X--> A with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (A ---X--> A) => {
+        Graph<
+            /* EdgeAttributeType */ (),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
+            /* VertexIdType */ usize
+        >
+    };
+
+    (X ---A--> X with $($property:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (X ---A--> X) => {
+        Graph<
+            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ (),
+            /* VertexIdType */ usize
+        >
+    };
+
+    (A ---A--> A with $($properties:ident = $value:ty),+) => {
+        Graph<
+            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+            /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+        >
+    };
+
+    (A ---A--> A) => {
+        Graph<
+            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeIdType */ u8,
+            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
+            /* VertexIdType */ usize
+        >
     };
 }
 
@@ -1147,33 +1284,33 @@ mod tests {
 
     #[test]
     fn graph_new_xxx_with() {
-        let mut g = graph!(X ---X--- X
+        let mut g: graph!(X ---X--- X
         with
-            GraphProperty::VertexIdType = i8
-        );
+            VertexIdType = i8
+        ) = Graph::new();
         assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn graph_new_axa() {
-        let mut g = graph!(A ---X--- A);
+        let mut g: graph!(A ---X--- A) = Graph::new();
         assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn graph_new_axa_with() {
-        let mut g = graph!(A ---X--- A
+        let mut g: graph!(A ---X--- A
         with
-            GraphProperty::VertexIdType = i8,
-            GraphProperty::VertexAttributeCollectionType = ()
-        );
+            VertexIdType = i8,
+            VertexAttributeCollectionType = ()
+        ) = Graph::new();
         assert_eq!(g.add_v(None), 0);
     }
 
     #[test]
     fn undirected_graph1() {
         // Undirected simple unattributed graph
-        let mut g = graph!(X ---X--- X);
+        let mut g: graph!(X ---X--- X) = Graph::new();
         // Add vertices
         assert_eq!(g.add_v(None), 0);
         assert_eq!(g.add_v(Some(1)), 1);
@@ -1222,7 +1359,7 @@ mod tests {
         ";
         let buffer_reader = BufReader::new(INPUT.as_bytes());
         let gnbs_reader = GNBSReader;
-        let mut g = graph!(A ---X--- A);
+        let mut g: graph!(A ---X--- A) = Graph::new();
         let g_result = gnbs_reader.read_graph(buffer_reader);
         assert!(g_result.is_ok());
         g = g_result.unwrap();

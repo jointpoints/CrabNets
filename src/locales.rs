@@ -257,57 +257,6 @@ where
     /// * `Option<EdgeDirection>` - `Some(value)` is returned if the required  edge  was
     /// found; `None` is returned otherwise.
     fn e_direction(&self, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<EdgeDirection>;
-    /// # Set of incident edges
-    /// 
-    /// ## Description
-    /// Get a hash set of all edges in this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>` - a hash  set  with  the
-    /// information about all edges incident on the vertex associated with this locale.
-    fn incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    /// # Set of incoming incident edges
-    /// 
-    /// ## Description
-    /// Get a hash set of all incoming edges in this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>` - a hash  set  with  the
-    /// information about all incoming edges incident on the vertex associated with this
-    /// locale.
-    fn incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    /// # Set of outgoing incident edges
-    /// 
-    /// ## Description
-    /// Get a hash set of all outgoing edges in this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>` - a hash  set  with  the
-    /// information about all outgoing edges incident on the vertex associated with this
-    /// locale.
-    fn incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
-    /// # Set of undirected incident edges
-    /// 
-    /// ## Description
-    /// Get a hash set of all undirected edges in this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>` - a hash  set  with  the
-    /// information about all undirected edges incident on the  vertex  associated  with
-    /// this locale.
-    fn incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>>;
     /// # Iterate over incident edges
     /// 
     /// ## Description
@@ -320,9 +269,9 @@ where
     /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
     /// iterator over all edges incident on the vertex associated with this locale.
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a;
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a;
     /// # Iterate over incoming incident edges
     /// 
     /// ## Description
@@ -336,9 +285,9 @@ where
     /// iterator over all incoming edges incident on the  vertex  associated  with  this
     /// locale.
     fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a;
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a;
     /// # Iterate over outgoing incident edges
     /// 
     /// ## Description
@@ -352,9 +301,9 @@ where
     /// iterator over all outgoing edges incident on the  vertex  associated  with  this
     /// locale.
     fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a;
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a;
     /// # Iterate over undirected incident edges
     /// 
     /// ## Description
@@ -368,9 +317,9 @@ where
     /// iterator over all undirected edges incident on the vertex associated  with  this
     /// locale.
     fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a;
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a;
     /// # Iterate over neighbours
     /// 
     /// ## Description
@@ -434,7 +383,20 @@ where
 pub enum EdgeToVertexRelation {
     Undirected,
     Incoming,
-    Outcoming,
+    Outgoing,
+}
+
+
+
+#[derive(Clone, Default)]
+struct SimpleEdgeCollection<EdgeAttributeCollectionType, VertexIdType>
+where
+    EdgeAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
+{
+    incoming: HashSet<VertexIdType>,
+    outgoing: HashMap<VertexIdType, EdgeAttributeCollectionType>,
+    undirected: HashMap<VertexIdType, Option<EdgeAttributeCollectionType>>,
 }
 
 
@@ -442,8 +404,8 @@ pub enum EdgeToVertexRelation {
 /// # Locale for undirected simple graphs
 /// 
 /// ## Description
-/// This locale optimises memory consumption for undirected simple graphs. See
-/// [`Graph`] for more details.
+/// This locale optimises memory consumption for undirected simple graphs. See [`Graph`]
+/// for more details.
 /// 
 /// [`Graph`]: crate::Graph#different-kinds-of-graphs
 #[derive(Clone, Default)]
@@ -536,48 +498,11 @@ where
         }
     }
 
-    fn incident_e<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
-        let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
-        for id2 in self.edges.keys() {
-            answer.insert(EdgeIteratorItem {
-                direction: EdgeDirection::Undirected,
-                edge_id: EdgeIdType::default(),
-                id1: VertexIdType::default(),
-                id2: id2.clone(),
-            });
-        }
-        answer
-    }
-
-    #[inline]
-    fn incident_e_in<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
-        HashSet::new()
-    }
-
-    #[inline]
-    fn incident_e_out<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
-        HashSet::new()
-    }
-
-    fn incident_e_undir<'a>(&'a self) -> HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> {
-        let mut answer: HashSet<EdgeIteratorItem<EdgeIdType, VertexIdType>> = HashSet::with_capacity(self.edges.len());
-        for id2 in self.edges.keys() {
-            answer.insert(EdgeIteratorItem {
-                direction: EdgeDirection::Undirected,
-                edge_id: EdgeIdType::default(),
-                id1: VertexIdType::default(),
-                id2: id2.clone(),
-            });
-        }
-        answer
-    }
-
     #[inline]
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a,
-    {
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
         Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
@@ -588,28 +513,25 @@ where
 
     #[inline]
     fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a,
-    {
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
         Box::new(empty())
     }
 
     #[inline]
     fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a,
-    {
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
         Box::new(empty())
     }
 
     #[inline]
     fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-    where
-        EdgeIdType: 'a,
-        VertexIdType: 'a,
-    {
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
         Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
@@ -662,6 +584,268 @@ where
     }
 
     #[inline]
+    fn v_attrs_mut(&mut self) -> &mut VertexAttributeCollectionType {
+        &mut self.attributes
+    }
+}
+
+
+
+/// # Locale for directed simple graphs
+/// 
+/// ## Description
+/// This locale optimises memory consumption for directed simple graphs.  See  [`Graph`]
+/// for more details.
+/// 
+/// [`Graph`]: crate::Graph#different-kinds-of-graphs
+#[derive(Clone, Default)]
+pub struct DirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+where
+    EdgeAttributeCollectionType: AttributeCollection,
+    VertexAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
+{
+    attributes: VertexAttributeCollectionType,
+    edges: SimpleEdgeCollection<EdgeAttributeCollectionType, VertexIdType>,
+}
+
+// DirectedSimpleLocale::Locale
+impl<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for DirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+where
+    EdgeAttributeCollectionType: AttributeCollection,
+    EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
+{
+    fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, _edge_id: Option<EdgeIdType>, store_edge_attributes: bool) -> EdgeIdType {
+        self.edges.incoming.remove(&id2);
+        self.edges.outgoing.remove(&id2);
+        self.edges.undirected.remove(&id2);
+        match relation {
+            EdgeToVertexRelation::Incoming => {
+                self.edges.incoming.insert(id2);
+            },
+            EdgeToVertexRelation::Outgoing => {
+                self.edges.outgoing.insert(id2, EdgeAttributeCollectionType::new());
+            },
+            EdgeToVertexRelation::Undirected => {
+                self.edges.undirected.insert(id2, if store_edge_attributes { Some(EdgeAttributeCollectionType::new()) } else { None });
+            },
+        }
+        EdgeIdType::default()
+    }
+
+    #[inline]
+    fn count_incident_e(&self) -> usize {
+        self.edges.incoming.len() + self.edges.outgoing.len() + self.edges.undirected.len()
+    }
+
+    #[inline]
+    fn count_incident_e_in(&self) -> usize {
+        self.edges.incoming.len()
+    }
+
+    #[inline]
+    fn count_incident_e_out(&self) -> usize {
+        self.edges.outgoing.len()
+    }
+
+    #[inline]
+    fn count_incident_e_undir(&self) -> usize {
+        self.edges.undirected.len()
+    }
+
+    #[inline]
+    fn count_neighbours(&self) -> usize {
+        self.edges.incoming.len() + self.edges.outgoing.len() + self.edges.undirected.len()
+    }
+
+    #[inline]
+    fn count_neighbours_in(&self) -> usize {
+        self.edges.incoming.len()
+    }
+
+    #[inline]
+    fn count_neighbours_out(&self) -> usize {
+        self.edges.outgoing.len()
+    }
+
+    #[inline]
+    fn count_neighbours_undir(&self) -> usize {
+        self.edges.undirected.len()
+    }
+
+    fn e_attrs(&self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> Option<&EdgeAttributeCollectionType> {
+        if self.edges.outgoing.contains_key(id2) {
+            Some(&self.edges.outgoing[id2])
+        } else if self.edges.undirected.contains_key(id2) {
+            self.edges.undirected[id2].as_ref()
+        } else {
+            None
+        }
+    }
+
+    fn e_attrs_mut(&mut self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> Option<&mut EdgeAttributeCollectionType> {
+        if self.edges.outgoing.contains_key(id2) {
+            self.edges.outgoing.get_mut(id2)
+        } else if self.edges.undirected.contains_key(id2) {
+            self.edges.undirected.get_mut(id2).unwrap().as_mut()
+        } else {
+            None
+        }
+    }
+
+    fn e_direction(&self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> Option<EdgeDirection> {
+        if self.edges.incoming.contains(id2) {
+            Some(EdgeDirection::Directed2to1)
+        } else if self.edges.outgoing.contains_key(id2) {
+            Some(EdgeDirection::Directed1to2)
+        } else if self.edges.undirected.contains_key(id2) {
+            Some(EdgeDirection::Undirected)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
+        Box::new(self.edges
+            .incoming
+            .iter()
+            .map(|x| EdgeIteratorItem {
+                direction: EdgeDirection::Directed2to1,
+                edge_id: EdgeIdType::default(),
+                id1: VertexIdType::default(),
+                id2: x.clone(),
+            })
+            .chain(
+                self.edges
+                .outgoing
+                .keys()
+                .map(|x| EdgeIteratorItem {
+                    direction: EdgeDirection::Directed1to2,
+                    edge_id: EdgeIdType::default(),
+                    id1: VertexIdType::default(),
+                    id2: x.clone(),
+                })
+            )
+            .chain(
+                self.edges
+                .undirected
+                .keys()
+                .map(|x| EdgeIteratorItem {
+                    direction: EdgeDirection::Undirected,
+                    edge_id: EdgeIdType::default(),
+                    id1: VertexIdType::default(),
+                    id2: x.clone(),
+                })
+            )
+        )
+    }
+
+    #[inline]
+    fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
+        Box::new(self.edges.incoming.iter().map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Directed2to1,
+            edge_id: EdgeIdType::default(),
+            id1: VertexIdType::default(),
+            id2: x.clone()
+        }))
+    }
+
+    #[inline]
+    fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
+        Box::new(self.edges.outgoing.keys().map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Directed1to2,
+            edge_id: EdgeIdType::default(),
+            id1: VertexIdType::default(),
+            id2: x.clone()
+        }))
+    }
+
+    #[inline]
+    fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a {
+        Box::new(self.edges.undirected.keys().map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Undirected,
+            edge_id: EdgeIdType::default(),
+            id1: VertexIdType::default(),
+            id2: x.clone()
+        }))
+    }
+
+    #[inline]
+    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges
+            .incoming
+            .iter()
+            .cloned()
+            .chain(
+                self.edges
+                .outgoing
+                .keys()
+                .cloned()
+            )
+            .chain(
+                self.edges
+                .undirected
+                .keys()
+                .cloned()
+            )
+        )
+    }
+
+    #[inline]
+    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges.incoming.iter().cloned())
+    }
+
+    #[inline]
+    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges.outgoing.keys().cloned())
+    }
+
+    #[inline]
+    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edges.undirected.keys().cloned())
+    }
+
+    #[inline]
+    fn new() -> Self {
+        DirectedSimpleLocale { attributes: VertexAttributeCollectionType::new(), edges: SimpleEdgeCollection { incoming: HashSet::new(), outgoing: HashMap::new(), undirected: HashMap::new() } }
+    }
+
+    fn remove_e(&mut self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> bool {
+        let answer = self.edges.incoming.contains(id2) || self.edges.outgoing.contains_key(id2) || self.edges.undirected.contains_key(id2);
+        self.edges.incoming.remove(id2);
+        self.edges.outgoing.remove(id2);
+        self.edges.undirected.remove(id2);
+        answer
+    }
+
+    fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool {
+        let answer = self.edges.incoming.contains(id2) || self.edges.outgoing.contains_key(id2) || self.edges.undirected.contains_key(id2);
+        self.edges.incoming.remove(id2);
+        self.edges.outgoing.remove(id2);
+        self.edges.undirected.remove(id2);
+        answer
+    }
+
+    fn v_attrs(&self) -> &VertexAttributeCollectionType {
+        &self.attributes
+    }
+
     fn v_attrs_mut(&mut self) -> &mut VertexAttributeCollectionType {
         &mut self.attributes
     }
