@@ -1,5 +1,5 @@
 use std::{collections::{HashMap, HashSet}, iter::empty};
-use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, EdgeToVertexRelation, Id};
+use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Id};
 
 
 
@@ -431,6 +431,21 @@ where
 
 
 
+pub enum EdgeToVertexRelation {
+    Undirected,
+    Incoming,
+    Outcoming,
+}
+
+
+
+/// # Locale for undirected simple graphs
+/// 
+/// ## Description
+/// This locale optimises memory consumption for undirected simple graphs. See
+/// [`Graph`] for more details.
+/// 
+/// [`Graph`]: crate::Graph#different-kinds-of-graphs
 #[derive(Clone, Default)]
 pub struct UndirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
 where

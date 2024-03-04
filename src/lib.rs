@@ -60,6 +60,7 @@ pub mod attribute;
 pub mod errors;
 pub mod io;
 pub mod locales;
+pub mod topology_tests;
 
 use std::{
     collections::HashMap,
@@ -169,14 +170,6 @@ pub enum EdgeDirection {
 
 
 
-pub enum EdgeToVertexRelation {
-    Undirected,
-    Incoming,
-    Outcoming,
-}
-
-
-
 #[derive(Hash, PartialEq, Eq)]
 pub struct EdgeIteratorItem<EdgeIdType, VertexIdType>
 where
@@ -239,6 +232,11 @@ where
     #[inline]
     fn e_attrs(&self, id1: &T::VertexIdType, id2: &T::VertexIdType, edge_id: &T::EdgeIdType) -> CrabNetsResult<&T::EdgeAttributeCollectionType> {
         self.unwrap().e_attrs(id1, id2, edge_id)
+    }
+
+    #[inline]
+    fn iter_v<'a>(&'a self) -> Box<dyn Iterator<Item = T::VertexIdType> + 'a> {
+        self.unwrap().iter_v()
     }
 
     #[inline]
@@ -441,6 +439,18 @@ where
     /// [Details]: #e-attrs-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType>;
+    /// # Iterate over vertices
+    /// 
+    /// ## Description
+    /// Iterate over all vertices of the graph.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an iterator over  the  vertices  of
+    /// the vertices of the graph.
+    fn iter_v<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     /// # Immutable reference to vertex attributes
     /// 
     /// ## Description
@@ -847,6 +857,11 @@ where
         } else {
             Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id1)))
         }
+    }
+
+    #[inline]
+    fn iter_v<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+        Box::new(self.edge_list.keys().cloned())
     }
 
     #[inline]
