@@ -269,9 +269,9 @@ where
     /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
     /// iterator over all edges incident on the vertex associated with this locale.
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a;
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
     /// # Iterate over incoming incident edges
     /// 
     /// ## Description
@@ -285,9 +285,9 @@ where
     /// iterator over all incoming edges incident on the  vertex  associated  with  this
     /// locale.
     fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a;
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
     /// # Iterate over outgoing incident edges
     /// 
     /// ## Description
@@ -301,9 +301,9 @@ where
     /// iterator over all outgoing edges incident on the  vertex  associated  with  this
     /// locale.
     fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a;
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
     /// # Iterate over undirected incident edges
     /// 
     /// ## Description
@@ -317,9 +317,28 @@ where
     /// iterator over all undirected edges incident on the vertex associated  with  this
     /// locale.
     fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a;
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
+    /// # Iterate over edges with attributes
+    /// 
+    /// ## Description
+    /// Iterate over all edges that store their [attribute collections][attrs]  in  this
+    /// locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// iterator over all edges incident on the vertex associated with this locale  that
+    /// have their attribute collections stored in this locale.
+    /// 
+    /// [attrs]: crate::attribute::AttributeCollection
+    fn iter_incident_e_with_attrs<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a;
     /// # Iterate over neighbours
     /// 
     /// ## Description
@@ -371,7 +390,7 @@ where
     /// * `Box<dyn Iterator<Item = VertexIdType>>` - an iterator over  all  'undirected'
     /// adjacent vertices.
     fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    fn new() -> Self;
+    fn new(associated_vertex_id: VertexIdType) -> Self;
     fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
     fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
     fn v_attrs(&self) -> &VertexAttributeCollectionType;
@@ -415,6 +434,7 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
+    associated_vertex_id: VertexIdType,
     attributes: VertexAttributeCollectionType,
     edges: HashMap<VertexIdType, Option<EdgeAttributeCollectionType>>,
 }
@@ -500,43 +520,61 @@ where
 
     #[inline]
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
-        Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
+        Box::new(self.edges.keys().map(|x| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
-            id2: id2.clone(),
+            id1: self.associated_vertex_id.clone(),
+            id2: x.clone(),
         }))
     }
 
     #[inline]
     fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(empty())
     }
 
     #[inline]
     fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(empty())
     }
 
     #[inline]
     fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
-        Box::new(self.edges.keys().map(|id2| EdgeIteratorItem {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
+        Box::new(self.edges.keys().map(|x| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
-            id2: id2.clone(),
+            id1: self.associated_vertex_id.clone(),
+            id2: x.clone(),
+        }))
+    }
+
+    #[inline]
+    fn iter_incident_e_with_attrs<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a,
+    {
+        Box::new(self.edges.keys().filter(|&x| self.associated_vertex_id <= *x).map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Undirected,
+            edge_id: EdgeIdType::default(),
+            id1: self.associated_vertex_id.clone(),
+            id2: x.clone(),
         }))
     }
 
@@ -561,8 +599,9 @@ where
     }
 
     #[inline]
-    fn new() -> Self {
+    fn new(associated_vertex_id: VertexIdType) -> Self {
         UndirectedSimpleLocale{
+            associated_vertex_id,
             attributes: VertexAttributeCollectionType::new(),
             edges: HashMap::new(),
         }
@@ -605,6 +644,7 @@ where
     VertexAttributeCollectionType: AttributeCollection,
     VertexIdType: Id,
 {
+    associated_vertex_id: VertexIdType,
     attributes: VertexAttributeCollectionType,
     edges: SimpleEdgeCollection<EdgeAttributeCollectionType, VertexIdType>,
 }
@@ -709,16 +749,17 @@ where
 
     #[inline]
     fn iter_incident_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(self.edges
             .incoming
             .iter()
             .map(|x| EdgeIteratorItem {
                 direction: EdgeDirection::Directed2to1,
                 edge_id: EdgeIdType::default(),
-                id1: VertexIdType::default(),
+                id1: self.associated_vertex_id.clone(),
                 id2: x.clone(),
             })
             .chain(
@@ -728,7 +769,7 @@ where
                 .map(|x| EdgeIteratorItem {
                     direction: EdgeDirection::Directed1to2,
                     edge_id: EdgeIdType::default(),
-                    id1: VertexIdType::default(),
+                    id1: self.associated_vertex_id.clone(),
                     id2: x.clone(),
                 })
             )
@@ -739,7 +780,7 @@ where
                 .map(|x| EdgeIteratorItem {
                     direction: EdgeDirection::Undirected,
                     edge_id: EdgeIdType::default(),
-                    id1: VertexIdType::default(),
+                    id1: self.associated_vertex_id.clone(),
                     id2: x.clone(),
                 })
             )
@@ -748,41 +789,64 @@ where
 
     #[inline]
     fn iter_incident_e_in<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(self.edges.incoming.iter().map(|x| EdgeIteratorItem {
             direction: EdgeDirection::Directed2to1,
             edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
+            id1: self.associated_vertex_id.clone(),
             id2: x.clone()
         }))
     }
 
     #[inline]
     fn iter_incident_e_out<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(self.edges.outgoing.keys().map(|x| EdgeIteratorItem {
             direction: EdgeDirection::Directed1to2,
             edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
+            id1: self.associated_vertex_id.clone(),
             id2: x.clone()
         }))
     }
 
     #[inline]
     fn iter_incident_e_undir<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
-        where
-            EdgeIdType: 'a,
-            VertexIdType: 'a {
+    where
+        EdgeIdType: 'a,
+        VertexIdType: 'a,
+    {
         Box::new(self.edges.undirected.keys().map(|x| EdgeIteratorItem {
             direction: EdgeDirection::Undirected,
             edge_id: EdgeIdType::default(),
-            id1: VertexIdType::default(),
+            id1: self.associated_vertex_id.clone(),
             id2: x.clone()
         }))
+    }
+
+    #[inline]
+    fn iter_incident_e_with_attrs<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
+        where
+            EdgeIdType: 'a,
+            VertexIdType: 'a,
+    {
+        Box::new(self.edges.outgoing.keys().map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Undirected,
+            edge_id: EdgeIdType::default(),
+            id1: self.associated_vertex_id.clone(),
+            id2: x.clone()
+        })
+        .chain(self.edges.undirected.keys().filter(|&x| self.associated_vertex_id <= *x).map(|x| EdgeIteratorItem {
+            direction: EdgeDirection::Directed1to2,
+            edge_id: EdgeIdType::default(),
+            id1: self.associated_vertex_id.clone(),
+            id2: x.clone()
+        })))
     }
 
     #[inline]
@@ -822,8 +886,12 @@ where
     }
 
     #[inline]
-    fn new() -> Self {
-        DirectedSimpleLocale { attributes: VertexAttributeCollectionType::new(), edges: SimpleEdgeCollection { incoming: HashSet::new(), outgoing: HashMap::new(), undirected: HashMap::new() } }
+    fn new(associated_vertex_id: VertexIdType) -> Self {
+        DirectedSimpleLocale {
+            associated_vertex_id,
+            attributes: VertexAttributeCollectionType::new(),
+            edges: SimpleEdgeCollection { incoming: HashSet::new(), outgoing: HashMap::new(), undirected: HashMap::new() }
+        }
     }
 
     fn remove_e(&mut self, id2: &VertexIdType, _edge_id: &EdgeIdType) -> bool {

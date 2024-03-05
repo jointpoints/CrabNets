@@ -235,6 +235,11 @@ where
     }
 
     #[inline]
+    fn iter_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<T::EdgeIdType, T::VertexIdType>> + 'a> {
+        self.unwrap().iter_e()
+    }
+
+    #[inline]
     fn iter_v<'a>(&'a self) -> Box<dyn Iterator<Item = T::VertexIdType> + 'a> {
         self.unwrap().iter_v()
     }
@@ -439,6 +444,18 @@ where
     /// [Details]: #e-attrs-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType>;
+    /// # Iterate over edges
+    /// 
+    /// ## Description
+    /// Iterate over all edges of the graph.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// *  `Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>>>`  -  an
+    /// interator over the edges of the graph.
+    fn iter_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>;
     /// # Iterate over vertices
     /// 
     /// ## Description
@@ -859,6 +876,10 @@ where
         }
     }
 
+    fn iter_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
+        Box::new(self.edge_list.iter().map(|(_, x)| x.iter_incident_e_with_attrs()).flatten())
+    }
+
     #[inline]
     fn iter_v<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edge_list.keys().cloned())
@@ -952,11 +973,11 @@ where
         let return_value: VertexIdType;
         match id {
             Some(value) => {
-                self.edge_list.insert(value.clone(), LocaleType::new());
+                self.edge_list.insert(value.clone(), LocaleType::new(value.clone()));
                 return_value = value;
             },
             None => {
-                self.edge_list.insert(self.min_free_vertex_id.clone(), LocaleType::new());
+                self.edge_list.insert(self.min_free_vertex_id.clone(), LocaleType::new(self.min_free_vertex_id.clone()));
                 return_value = self.min_free_vertex_id.clone();
             },
         }
@@ -1278,9 +1299,7 @@ macro_rules! graph {
 
 #[cfg(test)]
 mod tests {
-    use std::io::BufReader;
-
-    use crate::{io::{gnbs::GNBSReader, Reader}, *};
+    use crate::*;
 
     #[test]
     fn graph_new_xxx_with() {
@@ -1344,27 +1363,5 @@ mod tests {
         assert_eq!(g.add_v(None), 3);
         assert_eq!(g.count_v(), 5);
         assert_eq!(g.count_e(), 1);
-    }
-
-    #[test]
-    fn read_gnbs() {
-        const INPUT: &str = "
-        # Test number 1
-        AV LS Names
-        V 1 X
-        V 3 [ \"Romy , \" , ]
-        V 2 [     ]
-        E 1 2
-        E 2 3
-        ";
-        let buffer_reader = BufReader::new(INPUT.as_bytes());
-        let gnbs_reader = GNBSReader;
-        let mut g: graph!(A ---X--- A) = Graph::new();
-        let g_result = gnbs_reader.read_graph(buffer_reader);
-        assert!(g_result.is_ok());
-        g = g_result.unwrap();
-        assert_eq!(g.count_v(), 3);
-        assert_eq!(g.count_e(), 2);
-        assert_eq!(g.v_attrs_mut(&3).unwrap().get(&"Names".to_string()).unwrap().downcast::<Vec<String>>().unwrap(), &vec!["Romy , ".to_string()]);
     }
 }

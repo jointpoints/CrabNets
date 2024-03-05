@@ -1,23 +1,24 @@
-use std::{collections::HashSet, fmt::Display, io::{BufRead, BufReader, Read}, str::FromStr};
+use std::{cmp::Ordering, collections::HashSet, fmt::Display, io::{BufRead, BufReader, BufWriter, Read, Write}, str::FromStr};
+use itertools::Itertools;
 use regex::Regex;
 use crate::{
-    BasicMutableGraph, Id, CrabNetsError, CrabNetsResult, StaticDispatchAttributeValue
+    BasicImmutableGraph, BasicMutableGraph, CrabNetsError, CrabNetsResult, EdgeDirection, Id, StaticDispatchAttributeValue
 };
-use super::{AttributeCollectionIO, AttributeToken, Reader};
+use super::{AttributeCollectionIO, AttributeToken, Reader, Writer};
 
 
 
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-// * AUXILIARY ITEMS                                                                   *
+// * AUXILIARY ITEMS (COMMON)                                                          *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
 macro_rules! define_gnbs_attribute_type {
-    ($($type_name: ident),+) => {
-        #[derive(Clone, Copy, Debug)]
+    ($($type_name: ident -- $static_dispatch_attribute_value_variant:ident),+) => {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         enum GNBSAttributeType {
             $($type_name),+
         }
@@ -29,21 +30,29 @@ macro_rules! define_gnbs_attribute_type {
                 })
             }
         }
+
+        impl From<StaticDispatchAttributeValue> for GNBSAttributeType {
+            fn from(value: StaticDispatchAttributeValue) -> Self {
+                match value {
+                    $(StaticDispatchAttributeValue::$static_dispatch_attribute_value_variant(_) => GNBSAttributeType::$type_name,)+
+                }
+            }
+        }
     };
 }
 
 define_gnbs_attribute_type!(
-    I1, I2, I4, I8,
-    U1, U2, U4, U8,
-    F4, F8,
-    B, S,
-    LI1, LI2, LI4, LI8,
-    LU1, LU2, LU4, LU8,
-    LF4, LF8,
-    LB, LS,
-    CI1, CI2, CI4, CI8,
-    CU1, CU2, CU4, CU8,
-    CB, CS
+    I1 -- Int8, I2 -- Int16, I4 -- Int32, I8 -- Int64,
+    U1 -- UInt8, U2 -- UInt16, U4 -- UInt32, U8 -- UInt64,
+    F4 -- Float32, F8 -- Float64,
+    B -- Bool, S -- Str,
+    LI1 -- VecInt8, LI2 -- VecInt16, LI4 -- VecInt32, LI8 -- VecInt64,
+    LU1 -- VecUInt8, LU2 -- VecUInt16, LU4 -- VecUInt32, LU8 -- VecUInt64,
+    LF4 -- VecFloat32, LF8 -- VecFloat64,
+    LB -- VecBool, LS -- VecStr,
+    CI1 -- SetInt8, CI2 -- SetInt16, CI4 -- SetInt32, CI8 -- SetInt64,
+    CU1 -- SetUInt8, CU2 -- SetUInt16, CU4 -- SetUInt32, CU8 -- SetUInt64,
+    CB -- SetBool, CS -- SetStr
 );
 
 
@@ -52,6 +61,14 @@ struct AttributeMetadata {
     name: String,
     gnbs_type: GNBSAttributeType,
 }
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// * AUXILIARY ITEMS (GNBSREADER)                                                      *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
@@ -479,14 +496,68 @@ where
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// * AUXILIARY ITEMS (GNBSWRITER)                                                      *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+fn collect_vertex_attributes<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(graph: &G) -> CrabNetsResult<Vec<AttributeMetadata>>
+where
+    G: BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    EdgeAttributeCollectionType: AttributeCollectionIO,
+    EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollectionIO,
+    VertexIdType: Id,
+{
+    const FUNCTION_PATH: &str = "GNBSWriter::Writer::write_graph";
+    let mut answer = Vec::new();
+    for attribute_collection in graph.iter_v().map(|x| graph.v_attrs(&x).unwrap()) {
+        for attribute_token in attribute_collection.io_iter_contents() {
+            match answer.binary_search_by_key(&attribute_token.name, |x: &AttributeMetadata| &x.name) {
+                Ok(value) => if answer[value].gnbs_type != attribute_token.value.into() {
+                    return Err(CrabNetsError::new(FUNCTION_PATH, format!("The type of vertex attribute '{}' differs across different attribute collections.", attribute_token.name)));
+                },
+                Err(value) => answer.insert(value, AttributeMetadata { name: attribute_token.name.to_string(), gnbs_type: attribute_token.value.into() }),
+            }
+        }
+    }
+    Ok(answer)
+}
+
+fn collect_edge_attributes<G, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(graph: &G) -> CrabNetsResult<Vec<AttributeMetadata>>
+where
+    G: BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    EdgeAttributeCollectionType: AttributeCollectionIO,
+    EdgeIdType: Id,
+    VertexAttributeCollectionType: AttributeCollectionIO,
+    VertexIdType: Id,
+{
+    const FUNCTION_PATH: &str = "GNBSWriter::Writer::write_graph";
+    let mut answer = Vec::new();
+    for attribute_collection in graph.iter_e().map(|x| graph.e_attrs(&x.id1, &x.id2, &x.edge_id).unwrap()) {
+        for attribute_token in attribute_collection.io_iter_contents() {
+            match answer.binary_search_by_key(&attribute_token.name, |x: &AttributeMetadata| &x.name) {
+                Ok(value) => if answer[value].gnbs_type != attribute_token.value.into() {
+                    return Err(CrabNetsError::new(FUNCTION_PATH, format!("The type of edge attribute '{}' differs across different attribute collections.", attribute_token.name)));
+                },
+                Err(value) => answer.insert(value, AttributeMetadata { name: attribute_token.name.to_string(), gnbs_type: attribute_token.value.into() }),
+            }
+        }
+    }
+    Ok(answer)
+}
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 // * READER/WRITER                                                                     *
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
 
 pub struct GNBSReader;
-
-
 
 // GNBSReader::Reader
 impl<'a> Reader for GNBSReader {
@@ -502,8 +573,8 @@ impl<'a> Reader for GNBSReader {
         const FUNCTION_PATH: &str = "GNBSReader::Reader::read_graph";
         let mut new_graph = G::default();
         let mut state = DocumentState::ExpectingVertexAttributeOrEdgeAttributeOrVertex;
-        let mut vertex_attributes: Vec<AttributeMetadata> = Vec::new();
-        let mut edge_attributes: Vec<AttributeMetadata> = Vec::new();
+        let mut vertex_attributes = Vec::new();
+        let mut edge_attributes = Vec::new();
         let mut line_number = 0usize;
         for line_result in buffer_reader.lines() {
             line_number += 1;
@@ -562,5 +633,170 @@ impl<'a> Reader for GNBSReader {
             }
         }
         Ok(new_graph)
+    }
+}
+
+
+
+pub struct GNBSWriter;
+
+// GNBSWriter::Writer
+impl Writer for GNBSWriter {
+    fn write_graph<G, W, EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>(&self, graph: &G, buffer_writer: &mut BufWriter<W>) -> CrabNetsResult<()>
+    where
+        G: BasicImmutableGraph<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+        W: std::io::prelude::Write,
+        EdgeAttributeCollectionType: AttributeCollectionIO,
+        EdgeIdType: Id,
+        VertexAttributeCollectionType: AttributeCollectionIO,
+        VertexIdType: Id,
+    {
+        const HEADER: &[u8] =
+b"# GNBS serialisation of a graph
+# 
+# GNBS format specification:
+#     ...
+
+# VERTEX ATTRIBUTES
+";
+        let vertex_attributes = collect_vertex_attributes(graph)?;
+        let edge_attributes = collect_edge_attributes(graph)?;
+        buffer_writer.write(HEADER).unwrap();
+        if vertex_attributes.len() == 0 {
+            buffer_writer.write(b"# No vertex attributes have been defined for this graph\n\n# VERTICES\n").unwrap();
+        } else {
+            for attribute in vertex_attributes.iter() {
+                buffer_writer.write(format!("AV {:?} {}\n", attribute.gnbs_type, attribute.name).as_bytes()).unwrap();
+            }
+            buffer_writer.write(b"\n# VERTICES\n").unwrap();
+        }
+        if graph.count_v() == 0 {
+            buffer_writer.write(b"# This graph doesn't contain any vertices\n").unwrap();
+        }
+        for id in graph.iter_v().sorted() {
+            buffer_writer.write(format!("V {}", id).as_bytes()).unwrap();
+            for attribute in vertex_attributes.iter() {
+                buffer_writer.write(match graph.v_attrs(&id).unwrap().io_query_contents(&attribute.name) {
+                    Some(value) => format!(" {:?}", value),
+                    None => " X".to_string()
+                }.as_bytes()).unwrap();
+            }
+            buffer_writer.write(b"\n").unwrap();
+        }
+        buffer_writer.write(b"\n# EDGE ATTRIBUTES\n").unwrap();
+        if edge_attributes.len() == 0 {
+            buffer_writer.write(b"# No edge attributes have been defined for this graph\n\n# EDGES\n").unwrap();
+        } else {
+            for attribute in edge_attributes.iter() {
+                buffer_writer.write(format!("AE {:?} {}\n", attribute.gnbs_type, attribute.name).as_bytes()).unwrap();
+            }
+            buffer_writer.write(b"\n# EDGES\n").unwrap();
+        }
+        if graph.count_e() == 0 {
+            buffer_writer.write(b"# This graph doesn't contain any edges\n").unwrap();
+        }
+        for edge in graph.iter_e().sorted_by(|x, y| match x.id1.cmp(&y.id1) { Ordering::Equal => x.id2.cmp(&y.id2), value => value, }) {
+            buffer_writer.write(if edge.direction == EdgeDirection::Undirected { format!("E {} {}", edge.id1, edge.id2) } else { format!("A {} {}", edge.id1, edge.id2) }.as_bytes()).unwrap();
+            for attribute in edge_attributes.iter() {
+                buffer_writer.write(match graph.e_attrs(&edge.id1, &edge.id2, &edge.edge_id).unwrap().io_query_contents(&attribute.name) {
+                    Some(value) => format!(" {:?}", value),
+                    None => " X".to_string()
+                }.as_bytes()).unwrap();
+            }
+            buffer_writer.write(b"\n").unwrap();
+        }
+        Ok(())
+    }
+}
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use std::io::{BufWriter, Cursor};
+    use crate::*;
+    use super::*;
+
+    #[test]
+    fn read_from_gnbs1() {
+        const INPUT: &str = "
+        # Test number 1
+        AV LS Names
+        V 1 X
+        V 3 [ \"Romy , \" , ]
+        V 2 [     ]
+        E 1 2
+        E 2 3
+        ";
+        let buffer_reader = BufReader::new(INPUT.as_bytes());
+        let gnbs_reader = GNBSReader;
+        let g: graph!(A ---X--- A);
+        let g_result = gnbs_reader.read_graph(buffer_reader);
+        assert!(g_result.is_ok());
+        g = g_result.unwrap();
+        assert_eq!(g.count_v(), 3);
+        assert_eq!(g.count_e(), 2);
+        assert_eq!(g.v_attrs(&3).unwrap().get(&"Names".to_string()).unwrap().downcast::<Vec<String>>().unwrap(), &vec!["Romy , ".to_string()]);
+    }
+
+    #[test]
+    fn read_from_gnbs2() {
+        const INPUT: &str = "
+        # Test number 2
+        AV LS Names
+        V 1 X
+        V 3 [ Romy , \" , ]
+        V 2 [     ]
+        E 1 2
+        E 2 3
+        ";
+        let buffer_reader = BufReader::new(INPUT.as_bytes());
+        let gnbs_reader = GNBSReader;
+        let g_result: Result<graph!(X ---X--- X), CrabNetsError> = gnbs_reader.read_graph(buffer_reader);
+        assert!(g_result.is_err());
+    }
+
+    #[test]
+    fn write_to_gnbs1() {
+        const OUTPUT: &[u8] =
+b"# GNBS serialisation of a graph
+# 
+# GNBS format specification:
+#     ...
+
+# VERTEX ATTRIBUTES
+AV LS Names
+
+# VERTICES
+V 0 [\"Romy\"]
+V 1 []
+V 2 X
+
+# EDGE ATTRIBUTES
+# No edge attributes have been defined for this graph
+
+# EDGES
+A 0 1
+E 1 2
+";
+        let mut g: graph!(A ---X--> A) = Graph::new();
+        g.add_v(None);
+        g.v_attrs_mut(&0).unwrap().insert("Names".to_string(), Box::new(vec!["Romy".to_string()]));
+        g.add_v(None);
+        g.v_attrs_mut(&1).unwrap().insert("Names".to_string(), Box::new(Vec::<String>::new()));
+        g.add_v(None);
+        g.add_e(&1, &2, true, None).unwrap();
+        g.add_e(&0, &1, false, None).unwrap();
+        let mut output = vec![0u8; 500];
+        {
+            let mut cursor = Cursor::new(&mut output);
+            let mut buffer_writer = BufWriter::new(&mut cursor);
+            let gnbs_writer = GNBSWriter;
+            gnbs_writer.write_graph(&g, &mut buffer_writer).unwrap();
+            // buffer_writer.flush().unwrap();
+        }
+        assert_eq!(&output[0..OUTPUT.len()], OUTPUT);
     }
 }

@@ -1,4 +1,4 @@
-use std::{any::{Any, TypeId}, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash};
+use std::{any::{Any, TypeId}, collections::{HashMap, HashSet, hash_map::Iter}, fmt::Debug, hash::Hash};
 use dyn_clone::{DynClone, clone_trait_object};
 
 
@@ -76,6 +76,25 @@ macro_rules! define_static_dispatch_attribute_value_enum {
                 }
             }
         }
+
+        impl From<&Box<dyn DynamicDispatchAttributeValue>> for Option<StaticDispatchAttributeValue> {
+            fn from(dynamic_dispatch_value: &Box<dyn DynamicDispatchAttributeValue>) -> Self {
+                $(
+                    if let Some(value) = dynamic_dispatch_value.downcast::<$variant_type>() {
+                        return Some(StaticDispatchAttributeValue::$variant_name(value.clone()));
+                    }
+                )+
+                None
+            }
+        }
+
+        impl Debug for StaticDispatchAttributeValue {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(match self {
+                    $(StaticDispatchAttributeValue::$variant_name(value) => format!("{:?}", value),)+
+                }.as_ref())
+            }
+        }
     };
 }
 
@@ -125,12 +144,16 @@ impl<KeyType> DynamicDispatchAttributeMap<KeyType>
 where
     KeyType: Clone + Default + Eq + Hash,
 {
-    pub fn get(&self, name: &KeyType) -> Option<&Box<dyn DynamicDispatchAttributeValue>> {
-        self.attributes.get(name)
+    pub fn get(&self, attribute_name: &KeyType) -> Option<&Box<dyn DynamicDispatchAttributeValue>> {
+        self.attributes.get(attribute_name)
     }
     
-    pub fn insert(&mut self, name: KeyType, value: Box<dyn DynamicDispatchAttributeValue>) -> Option<Box<dyn DynamicDispatchAttributeValue>> {
-        self.attributes.insert(name, value)
+    pub fn insert(&mut self, attribute_name: KeyType, attribute_value: Box<dyn DynamicDispatchAttributeValue>) -> Option<Box<dyn DynamicDispatchAttributeValue>> {
+        self.attributes.insert(attribute_name, attribute_value)
+    }
+
+    pub fn iter<'a>(&'a self) -> Iter<'a, KeyType, Box<dyn DynamicDispatchAttributeValue>> {
+        self.attributes.iter()
     }
 }
 
