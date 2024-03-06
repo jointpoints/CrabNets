@@ -21,7 +21,7 @@ pub mod gnbs;
 
 use std::{fs::File, hash::Hash, io::{BufReader, BufWriter, Read, Write}, iter::empty, str::FromStr};
 use crate::{
-    attribute::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue}, errors::{CrabNetsError, CrabNetsResult}, io::gnbs::GNBSWriter, BasicImmutableGraph, BasicMutableGraph, DynamicDispatchAttributeMap, Graph, Id, Locale
+    attributes::{AttributeCollection, DynamicDispatchAttributeValue, StaticDispatchAttributeValue}, errors::{CrabNetsError, CrabNetsResult}, io::gnbs::GNBSWriter, BasicImmutableGraph, BasicMutableGraph, DynamicDispatchAttributeMap, Graph, Id, Locale
 };
 use gnbs::GNBSReader;
 

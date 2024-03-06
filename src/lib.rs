@@ -56,7 +56,7 @@ pub(self) mod private{
     pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
 }
 
-pub mod attribute;
+pub mod attributes;
 pub mod errors;
 pub mod io;
 pub mod locales;
@@ -69,7 +69,7 @@ use std::{
     marker::PhantomData,
     ops::AddAssign,
 };
-use attribute::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
+use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{CrabNetsError, CrabNetsResult};
 use locales::*;
 #[allow(unused_imports)]
@@ -95,7 +95,7 @@ use private::ConditionalType;
 /// displayable.
 pub trait Id
 where
-    Self: Clone + Default + Display + Eq + Hash + Ord,
+    Self: Clone + Display + Eq + Hash + Ord,
 {
     /// # Default value of ID
     /// 
@@ -109,7 +109,7 @@ where
     /// 
     /// ## Returns
     /// `Self` - the default value for the first possible ID.
-    // fn default() -> Self;
+    fn default() -> Self;
     /// # Advance the element
     /// 
     /// ## Description
@@ -127,9 +127,9 @@ where
 macro_rules! implement_vertex_id_trait_for {
     ($t: ty) => {
         impl Id for $t {
-            /*fn default() -> Self {
+            fn default() -> Self {
                 <$t>::MIN
-            }*/
+            }
         
             fn increment(&mut self) {
                 self.add_assign(1)
@@ -440,7 +440,7 @@ where
     /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
     /// ignored as simple graphs don't support edge IDs.
     /// 
-    /// [attrs]: attribute::AttributeCollection
+    /// [attrs]: attributes::AttributeCollection
     /// [Details]: #e-attrs-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType>;
@@ -483,7 +483,7 @@ where
     /// the  vertex  with  the  given  ID  exists;  `Err(CrabNetsError)`   is   returned
     /// otherwise.
     /// 
-    /// [attrs]: attribute::AttributeCollection
+    /// [attrs]: attributes::AttributeCollection
     fn v_attrs(&self, id: &VertexIdType) -> CrabNetsResult<&VertexAttributeCollectionType>;
     /// # Vertex degree
     /// 
@@ -689,7 +689,7 @@ where
     /// If the underlying [`Graph`] is [simple][kinds], the value of `edge_id`  will  be
     /// ignored as simple graphs don't support edge IDs.
     /// 
-    /// [attrs]: attribute::AttributeCollection
+    /// [attrs]: attributes::AttributeCollection
     /// [Details]: #e-attrs-mut-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs_mut(&mut self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&mut EdgeAttributeCollectionType>;
@@ -756,7 +756,7 @@ where
     /// if the vertex  with  the  given  ID  exists;  `Err(CrabNetsError)`  is  returned
     /// otherwise.
     /// 
-    /// [attrs]: attribute::AttributeCollection
+    /// [attrs]: attributes::AttributeCollection
     fn v_attrs_mut(&mut self, id: &VertexIdType) -> CrabNetsResult<&mut VertexAttributeCollectionType>;
 }
 
@@ -764,7 +764,8 @@ where
 
 /// # Graph
 /// ## Description
-/// ...
+/// This is the central struct of the entire library. It represents,  as  it's  easy  to
+/// guess, a graph: a network made of _vertices_ and _edges_ connecting them.
 /// 
 /// ## Different kinds of graphs
 /// There are many ways to categorise graphs into different classes, here we present the
@@ -774,26 +775,59 @@ where
 /// * **Undirected** - edges in such graphs have no direction, they  simply  indicate  a
 /// link between a pair of vertices.
 /// * **Directed** - edges in such graphs _can_ have direction; in  this  case,  we  say
-/// that the vertex where the edge starts is the **source** of the edge and  the  vertex
-/// where the edge ends is the **target** of the edge.
+/// that the vertex where the edge starts is the _source_ of the  edge  and  the  vertex
+/// where the edge ends is the _target_ of the edge.
 /// 
 /// Classes of graphs by edge uniqueness:
 /// * **Simple** - there's at most one edge between any 2 vertices.
 /// * **Multi-graphs** - there can be arbitrarily many edges between any 2 vertices; any
-/// pair of edges connecting the same pair of vertices will be called **parallel**.
+/// pair of edges connecting the same pair of vertices will be called _parallel_.
 /// 
 /// Each graph can be assigned with one label from  the  first  classification  and  one
 /// label from the second classification, thus making 4 possible combinations.  CrabNets
 /// supports all of them.
+/// 
+/// > ⚠️ **Warning!** Currently, multi-graphs are under development and not available.
 /// 
 /// Furthermore,  CrabNets  implements  certain  optimisations   for   each   of   these
 /// combinations, hence, it makes sense for you to carefully evaluate which exactly kind
 /// of graphs you're going to be dealing in your program with to enjoy the best possible
 /// performance you can get.
 /// 
+/// ## Representation of graphs
+/// CrabNets store graphs as edge lists. The local properties of the neighbourhood of
+/// each vertex is stored in a so-called _locale_ associated with it. See the
+/// [`locales`] module for more details.
+/// 
+/// Generally speaking, each vertex is identified by its unique ID. IDs are typically
+/// numbers, however, you can use any type that implements [`Id`] as the ID.
+/// 
+/// If you have a multi-graph, edges  will  also  have  their  own  IDs  to  distinguish
+/// between multiple parallel edges. Unlike vertex IDs, edge IDs must  be  unique  among
+/// all edges _incident on the same pair of vertices_!
+/// 
 /// ## Attributes
-/// Vertices and edges of graphs can store attributes.
-#[derive(Clone, Default)]
+/// Vertices and  edges  of  graphs  can  store  _attributes_  in  so-called  _attribute
+/// collections_. Attribute collection is a struct/enum that stores the information that
+/// you want to associate with a vertex or with an edge. CrabNets provide some  standard
+/// attribute collections for you  to  use,  see  the  [`attributes`]  module  for  more
+/// details.
+/// 
+/// You  can  access  the  attribute   collection   of   each   vertex   using   methods
+/// [`BasicImmutableGraph::v_attrs`],   [`BasicMutableGraph::v_attrs_mut`].    Likewise,
+/// methods [`BasicImmutableGraph::e_attrs`] and [`BasicMutableGraph::e_attrs_mut`] give
+/// you access to the attribute collection of a specific edge. These methods expose  the
+/// interface of the attribute collection you use, so the exact things you can  do  with
+/// these attribute collections depend on what functionality you implement for them.
+/// 
+/// ## Generic type parameters
+/// Graph is a generic type with the following generic type parameters:
+/// * `EdgeAttributeCollectionType` - the type of attribute collections for edges.
+/// * `EdgeIdType` - the type to use for edge IDs.
+/// * `LocaleType` - the locale to use to capture the local properties of the graph.
+/// * `VertexAttributeCollectionType` - the type of attribute collections for vertices.
+/// * `VertexIdType` - the type to use for vertex IDs.
+#[derive(Clone)]
 pub struct Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
@@ -1044,6 +1078,20 @@ where
     }
 }
 
+// Graph::Default
+impl<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType> Default for Graph<EdgeAttributeCollectionType, EdgeIdType, LocaleType, VertexAttributeCollectionType, VertexIdType>
+where
+    EdgeAttributeCollectionType: AttributeCollection,
+    EdgeIdType: Id,
+    LocaleType: Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>,
+    VertexAttributeCollectionType: AttributeCollection,
+    VertexIdType: Id,
+{
+    fn default() -> Self {
+        Graph { edge_list: HashMap::new(), min_free_vertex_id: VertexIdType::default(), phantom: PhantomData }
+    }
+}
+
 
 
 
@@ -1085,10 +1133,11 @@ macro_rules! graph_type_recognition_assistant {
 
 
 
-/// # A macro to fast and easily create a new graph
+/// # A macro to fast and easily define a graph type
+/// 
 /// ## Description
 /// There's one feature of [`Graph`] that comes both as a blessing and a curse:  it's  a
-/// generic type. [`Graph`] accepts multiple type parameters that have to  be  specified
+/// generic type. [`Graph`] accepts multiple type  parameters  that  have  to  be  given
 /// by you in a very specific order every time you create a  new  instance.  This  helps
 /// CrabNets to maintain its flexibility and allows you to adjust the  functionality  of
 /// your networks for your specific needs, however, it comes at its own cost of  tedious
@@ -1096,7 +1145,7 @@ macro_rules! graph_type_recognition_assistant {
 /// remembered and have to be looked up in the documentation.
 /// 
 /// This macro was created to avoid it as much as possible. With the help of `graph!()`,
-/// you can easily create all possible kinds of  graphs  CrabNets  has  to  offer  while
+/// you can easily pick out any [kind of graphs  CrabNets  has  to  offer][kinds]  while
 /// keeping your code clean and aesthetically appealing.
 /// 
 /// ## Basic use
@@ -1107,36 +1156,117 @@ macro_rules! graph_type_recognition_assistant {
 /// let g: graph!(X ===A==> X) = Graph::new();
 /// ```
 /// 
-/// Here, we have 3 tokens separated by whitespaces: '`X`', '`===A==>`' and '`X`'.
+/// Here, we have 3 tokens separated  by  whitespaces:  '`X`',  '`===A==>`'  and  '`X`'.
+/// Collectively, they form the _structural pattern_ of a graph.
 /// 
 /// The first _and_ the last token symbolise vertices of our network  and  show  whether
-/// they'll have any [attributes](Graph#attributes) or not.  Value  '`X`'  serves  as  a
-/// marker which says: 'We'll _never_ try to store  or  access  any  attributes  of  any
-/// vertex of the graph'. Needless to say, this allows CrabNets to optimise memory usage
-/// as we know in advance that there'll be no need to even declare attribute collections
-/// for any of the vertices.
+/// they'll have any [attributes][attrs] or not. Value '`X`' serves as  a  marker  which
+/// says: 'We'll _not_ store any attributes in the  vertices'.  Needless  to  say,  this
+/// allows CrabNets to optimise memory usage as we know in advance that there'll  be  no
+/// need to even declare [attribute collections][attrs2] for any of the vertices.
 /// 
 /// Note that the first and the last tokens must always be identical! Of course, one can
 /// argue that this notation is redundant and can be shortened by  getting  rid  of  the
-/// last token but we keep it for a better visual presentation.
+/// last token but we keep it this way for a better visual presentation.
 /// 
 /// As it's easy to guess now, the token in the middle symbolises edges of  the  network
 /// and their properties.
 /// 
 /// Look closer at this second token and you'll notice that it looks like 2 arrows  with
-/// the letter 'A' slapped on top of them going from the  left  'vertex'  to  the  right
+/// the letter '`A`' slapped on top of them going from the left 'vertex'  to  the  right
 /// 'vertex'. This pair of arrows means that we can have parallel edges,  i.e.  that  we
-/// want  our  graph  to  be  a   [multi-graph](Graph#different-kinds-of-graphs),   and,
-/// furthermore,   our   edges   can   be   [directed](Graph#different-kinds-of-graphs).
-/// Letter '`A`' in the middle, contrary to letter '`X`', means  that  our  edges  _can_
-/// have attributes stored in them.
+/// want our graph to be a [multi-graph][kinds], and,  furthermore,  our  edges  can  be
+/// [directed][kinds]. Letter '`A`' in the middle, contrary to letter '`X`', means  that
+/// our edges _can_ have attributes stored in them.
+/// 
+/// ## Possible configurations
+/// The type of all kinds of graphs supported by  CrabNets  by  default  can  always  be
+/// defined with this macro. For example, `graph!(A ---A--- A)` will stand for a  simple
+/// undirected   graph   where   both   vertices    and    edges    store    attributes;
+/// `graph!(A ---X--> A)` will stand for a simple directed  graph  where  only  vertices
+/// have attributes.
+/// 
+/// > ⚠️ **Warning!**  Milti-graphs  are  currently  under  development,  so  structural
+/// patterns with 'double arrows' won't work at this point.
+/// 
+/// ## Values of generic type parameters
+/// When you create a graph will this macro,  the  [generic type parameters][typeparams]
+/// of your graph will be defined as follows:
+/// * `EdgeAttributeCollectionType` will be substituted with:
+///     * [`DynamicDispatchAttributeMap<String>`] if the attribute marker for  edges  is
+///       '`A`'.
+///     * `()` if the attribute marker for edges is '`X`'.
+/// * `EdgeIdType` will be substituted with:
+///     * `u8` if the graph is simple (simple graphs don't support  [edge  IDs][edgeids]
+///       anyway, this value is purely symbolic).
+///     * `usize` if the graph is a multi-graph.
+/// * `LocaleType` will be substituted with:
+///     * [`SimpleUndirectedLocale`] if the graph is simple and undirected.
+///     * [`SimpleDirectedLocale`] if the graph is simple and directed.
+///     * `MultiUndirectedLocale` if the graph is a multi-graph  and  undirected  (under
+///       development).
+///     * `MultiDirectedLocale` if the  graph  is  a  multi-graph  and  directed  (under
+///       development).
+/// * `VertexAttributeCollectionType` will be substituted with:
+///     * [`DynamicDispatchAttributeMap<String>`] if the attribute marker  for  vertices
+///       is '`A`'.
+///     * `()` if the attribute marker for vertices is '`X`'.
+/// * `VertexIdType` will be substituted with `usize`.
+/// 
+/// Thus, `graph!(A ---X--- A)` expands to
+/// 
+/// ```
+/// Graph<(), u8, SimpleUndirectedLocale<(), DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>
+/// ```
+/// 
+/// Obviously, the `graph!` macro is much more pleasant to work with...
+/// 
+/// ## Advanced use
+/// You can overwrite the default assignments for many generic type parameters  of  your
+/// graph. To do this, enumerate the desired values for the generic type  parameters  in
+/// any order separating them from the structural pattern with the word `with`:
+/// 
+/// ```
+/// let g: graph!(X ===X=== X with VertexIdType = i32) = Graph::from_file("a.gnbs").unwrap();
+/// ```
+/// 
+/// If you don't explicitly set the value for some of the generic type parameters, their
+/// default values from the previous section will be taken.
+/// 
+/// If you set the value for a generic type parameter that contradicts the  restrictions
+/// set by the structural pattern, this value will be ignored. For example, if  you  try
+/// setting the type of the [attribute collection][attrs2] for the vertices of the graph
+/// that is declared not to support any vertex attributes:
+/// 
+/// ```
+/// let g: graph!(X ===X=== X
+///     with
+///         VertexIdType = i32,
+///         VertexAttributeCollectionType = MyCollection
+/// ) = Graph::from_file("a.gnbs").unwrap();
+/// ```
+/// 
+/// This macro call will expand to the exactly same  graph  type  as  the  previous  one
+/// (`VertexAttributeCollectionType = MyCollection` will be ignored).
+/// 
+/// The only generic type parameter that you'll never be able to change with this  macro
+/// is `LocaleType`. If you implement your own [locale], you won't be able to choose  it
+/// in `graph!`. If you try setting the value for `LocaleType` in this macro, you'll get
+/// an error.
+/// 
+/// [attrs]: Graph#attributes
+/// [attrs2]: attributes::AttributeCollection
+/// [edgeids]: Graph#representation-of-graphs
+/// [typeparams]: Graph#generic-type-parameters
+/// [kinds]: Graph#different-kinds-of-graphs
+/// [locale]: locales::Locale
 #[macro_export]
 macro_rules! graph {
     (X ---X--- X with $($property:ident = $value:ty),+) => {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1146,7 +1276,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1156,7 +1286,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1166,7 +1296,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1176,7 +1306,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1186,7 +1316,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1196,7 +1326,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1206,7 +1336,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ UndirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1216,7 +1346,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1226,7 +1356,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1236,7 +1366,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1246,7 +1376,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1256,7 +1386,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1266,7 +1396,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1276,7 +1406,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1286,7 +1416,7 @@ macro_rules! graph {
         Graph<
             /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ DirectedSimpleLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1307,7 +1437,7 @@ mod tests {
         with
             VertexIdType = i8
         ) = Graph::new();
-        assert_eq!(g.add_v(None), 0);
+        assert_eq!(g.add_v(None), -128);
     }
 
     #[test]
@@ -1323,11 +1453,11 @@ mod tests {
             VertexIdType = i8,
             VertexAttributeCollectionType = ()
         ) = Graph::new();
-        assert_eq!(g.add_v(None), 0);
+        assert_eq!(g.add_v(None), -128);
     }
 
     #[test]
-    fn undirected_graph1() {
+    fn add_degree_delete() {
         // Undirected simple unattributed graph
         let mut g: graph!(X ---X--- X) = Graph::new();
         // Add vertices

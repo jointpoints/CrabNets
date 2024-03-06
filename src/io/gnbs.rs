@@ -795,7 +795,6 @@ E 1 2
             let mut buffer_writer = BufWriter::new(&mut cursor);
             let gnbs_writer = GNBSWriter;
             gnbs_writer.write_graph(&g, &mut buffer_writer).unwrap();
-            // buffer_writer.flush().unwrap();
         }
         assert_eq!(&output[0..OUTPUT.len()], OUTPUT);
     }

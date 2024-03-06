@@ -1,5 +1,5 @@
 use std::{collections::{HashMap, HashSet}, iter::empty};
-use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Id};
+use crate::{attributes::AttributeCollection, EdgeDirection, EdgeIteratorItem, Id};
 
 
 
@@ -22,7 +22,7 @@ use crate::{attribute::AttributeCollection, EdgeDirection, EdgeIteratorItem, Id}
 /// [kinds]: crate::Graph#different-kinds-of-graphs
 pub trait Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType>
 where
-    Self: Clone + Default,
+    Self: Clone,
     EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
     VertexAttributeCollectionType: AttributeCollection,
@@ -66,7 +66,7 @@ where
     /// smaller ID, and if the edge is directed, the instance is stored in the locale of
     /// a source vertex. This behaviour is defined in [`BasicMutableGraph::add_e`][add_e].
     /// 
-    /// [attrs]: crate::attribute::AttributeCollection
+    /// [attrs]: crate::attributes::AttributeCollection
     /// [Details]: #add-e-details
     /// [add_e]: crate::BasicMutableGraph::add_e
     /// [kinds]: crate::Graph#different-kinds-of-graphs
@@ -216,7 +216,7 @@ where
     /// required edge was found and this locale is responsible for storing its attribute
     /// collection (see [`Locale::add_e`] for more details).
     /// 
-    /// [attrs]: crate::attribute::AttributeCollection
+    /// [attrs]: crate::attributes::AttributeCollection
     /// [e_attrs]: crate::BasicImmutableGraph::e_attrs
     /// [`Locale::add_e`]: #add-e-details
     fn e_attrs(&self, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<&EdgeAttributeCollectionType>;
@@ -238,7 +238,7 @@ where
     /// required edge was found and this locale is responsible for storing its attribute
     /// collection (see [`Locale::add_e`] for more details).
     /// 
-    /// [attrs]: crate::attribute::AttributeCollection
+    /// [attrs]: crate::attributes::AttributeCollection
     /// [e_attrs_mut]: crate::BasicMutableGraph::e_attrs_mut
     fn e_attrs_mut(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<&mut EdgeAttributeCollectionType>;
     /// # Edge direction
@@ -334,7 +334,7 @@ where
     /// iterator over all edges incident on the vertex associated with this locale  that
     /// have their attribute collections stored in this locale.
     /// 
-    /// [attrs]: crate::attribute::AttributeCollection
+    /// [attrs]: crate::attributes::AttributeCollection
     fn iter_incident_e_with_attrs<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a>
     where
         EdgeIdType: 'a,
@@ -407,7 +407,7 @@ pub enum EdgeToVertexRelation {
 
 
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct SimpleEdgeCollection<EdgeAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
@@ -420,15 +420,15 @@ where
 
 
 
-/// # Locale for undirected simple graphs
+/// # Locale for simple undirected graphs
 /// 
 /// ## Description
-/// This locale optimises memory consumption for undirected simple graphs. See [`Graph`]
+/// This locale optimises memory consumption for simple undirected graphs. See [`Graph`]
 /// for more details.
 /// 
 /// [`Graph`]: crate::Graph#different-kinds-of-graphs
 #[derive(Clone, Default)]
-pub struct UndirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+pub struct SimpleUndirectedLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
     VertexAttributeCollectionType: AttributeCollection,
@@ -439,8 +439,8 @@ where
     edges: HashMap<VertexIdType, Option<EdgeAttributeCollectionType>>,
 }
 
-// UndirectedSimpleLocale::Locale
-impl<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for UndirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+// SimpleUndirectedLocale::Locale
+impl<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for SimpleUndirectedLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
@@ -600,7 +600,7 @@ where
 
     #[inline]
     fn new(associated_vertex_id: VertexIdType) -> Self {
-        UndirectedSimpleLocale{
+        SimpleUndirectedLocale{
             associated_vertex_id,
             attributes: VertexAttributeCollectionType::new(),
             edges: HashMap::new(),
@@ -630,15 +630,15 @@ where
 
 
 
-/// # Locale for directed simple graphs
+/// # Locale for simple directed graphs
 /// 
 /// ## Description
-/// This locale optimises memory consumption for directed simple graphs.  See  [`Graph`]
+/// This locale optimises memory consumption for simple directed graphs.  See  [`Graph`]
 /// for more details.
 /// 
 /// [`Graph`]: crate::Graph#different-kinds-of-graphs
-#[derive(Clone, Default)]
-pub struct DirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+#[derive(Clone)]
+pub struct SimpleDirectedLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
     VertexAttributeCollectionType: AttributeCollection,
@@ -649,8 +649,8 @@ where
     edges: SimpleEdgeCollection<EdgeAttributeCollectionType, VertexIdType>,
 }
 
-// DirectedSimpleLocale::Locale
-impl<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for DirectedSimpleLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
+// SimpleDirectedLocale::Locale
+impl<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> Locale<EdgeAttributeCollectionType, EdgeIdType, VertexAttributeCollectionType, VertexIdType> for SimpleDirectedLocale<EdgeAttributeCollectionType, VertexAttributeCollectionType, VertexIdType>
 where
     EdgeAttributeCollectionType: AttributeCollection,
     EdgeIdType: Id,
@@ -887,7 +887,7 @@ where
 
     #[inline]
     fn new(associated_vertex_id: VertexIdType) -> Self {
-        DirectedSimpleLocale {
+        SimpleDirectedLocale {
             associated_vertex_id,
             attributes: VertexAttributeCollectionType::new(),
             edges: SimpleEdgeCollection { incoming: HashSet::new(), outgoing: HashMap::new(), undirected: HashMap::new() }

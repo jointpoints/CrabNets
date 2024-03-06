@@ -7,7 +7,7 @@
 //! [`Graph`]: crate::Graph
 //! [`ImmutableGraphContainer`]: crate::ImmutableGraphContainer
 use std::collections::{HashSet, VecDeque};
-use crate::{attribute::AttributeCollection, BasicImmutableGraph, Graph, Id, Locale};
+use crate::{attributes::AttributeCollection, BasicImmutableGraph, Graph, Id, Locale};
 
 
 
