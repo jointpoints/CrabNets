@@ -1327,7 +1327,7 @@ macro_rules! graph {
         >
     };
 
-    (A ---A--- A with $($properties:ident = $value:ty),+) => {
+    (A ---A--- A with $($property:ident = $value:ty),+) => {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
@@ -1407,7 +1407,7 @@ macro_rules! graph {
         >
     };
 
-    (A ---A--> A with $($properties:ident = $value:ty),+) => {
+    (A ---A--> A with $($property:ident = $value:ty),+) => {
         Graph<
             /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
