@@ -37,8 +37,8 @@ use gnbs::GNBSReader;
 
 pub struct AttributeToken<'a>
 {
-    name: &'a str,
-    value: StaticDispatchAttributeValue,
+    pub name: &'a str,
+    pub value: StaticDispatchAttributeValue,
 }
 
 

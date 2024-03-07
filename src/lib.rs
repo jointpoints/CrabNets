@@ -20,42 +20,6 @@
 
 
 
-pub(self) mod private{
-    use std::marker::PhantomData;
-
-    pub trait Conditional {
-        type Type: ?Sized;
-    }
-
-    pub struct ConditionalTypeCore<const C: bool, T, F>
-    where
-        T: ?Sized,
-        F: ?Sized,
-    {
-        t: PhantomData<T>,
-        f: PhantomData<F>,
-    }
-
-    impl<T, F> Conditional for ConditionalTypeCore<true, T, F>
-    where
-        T: ?Sized,
-        F: ?Sized,
-    {
-        type Type = T;
-    }
-
-    impl<T, F> Conditional for ConditionalTypeCore<false, T, F>
-    where
-        T: ?Sized,
-        F: ?Sized,
-    {
-        type Type = F;
-    }
-
-    #[allow(dead_code)]
-    pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
-}
-
 pub mod attributes;
 pub mod errors;
 pub mod io;
@@ -72,8 +36,48 @@ use std::{
 use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{CrabNetsError, CrabNetsResult};
 use locales::*;
-#[allow(unused_imports)]
-use private::ConditionalType;
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// * CONDITIONAL TYPE                                                                  *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+pub trait Conditional {
+    type Type: ?Sized;
+}
+
+pub struct ConditionalTypeCore<const C: bool, T, F>
+where
+    T: ?Sized,
+    F: ?Sized,
+{
+    t: PhantomData<T>,
+    f: PhantomData<F>,
+}
+
+impl<T, F> Conditional for ConditionalTypeCore<true, T, F>
+where
+    T: ?Sized,
+    F: ?Sized,
+{
+    type Type = T;
+}
+
+impl<T, F> Conditional for ConditionalTypeCore<false, T, F>
+where
+    T: ?Sized,
+    F: ?Sized,
+{
+    type Type = F;
+}
+
+#[allow(dead_code)]
+pub type ConditionalType<const C: bool, T, F> = <ConditionalTypeCore<C, T, F> as Conditional>::Type;
 
 
 
@@ -1113,6 +1117,7 @@ pub enum GraphProperty{
 
 
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! graph_type_recognition_assistant {
     ([$first_property:ident = $first_value:ty, $($property:ident = $value:ty),+], $required_property:ident, $default_value:ty) => {
         ConditionalType<
@@ -1152,7 +1157,7 @@ macro_rules! graph_type_recognition_assistant {
 /// Let's look at the following simple example and try to  understand  what's  going  on
 /// there.
 /// 
-/// ```
+/// ```ignore
 /// let g: graph!(X ===A==> X) = Graph::new();
 /// ```
 /// 
@@ -1215,7 +1220,7 @@ macro_rules! graph_type_recognition_assistant {
 /// 
 /// Thus, `graph!(A ---X--- A)` expands to
 /// 
-/// ```
+/// ```ignore
 /// Graph<(), u8, SimpleUndirectedLocale<(), DynamicDispatchAttributeMap<String>, usize>, DynamicDispatchAttributeMap<String>, usize>
 /// ```
 /// 
@@ -1226,7 +1231,7 @@ macro_rules! graph_type_recognition_assistant {
 /// graph. To do this, enumerate the desired values for the generic type  parameters  in
 /// any order separating them from the structural pattern with the word `with`:
 /// 
-/// ```
+/// ```ignore
 /// let g: graph!(X ===X=== X with VertexIdType = i32) = Graph::from_file("a.gnbs").unwrap();
 /// ```
 /// 
@@ -1238,7 +1243,7 @@ macro_rules! graph_type_recognition_assistant {
 /// setting the type of the [attribute collection][attrs2] for the vertices of the graph
 /// that is declared not to support any vertex attributes:
 /// 
-/// ```
+/// ```ignore
 /// let g: graph!(X ===X=== X
 ///     with
 ///         VertexIdType = i32,
