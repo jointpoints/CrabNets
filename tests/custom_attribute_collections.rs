@@ -54,10 +54,14 @@ impl AttributeCollectionIO for VertexCoordinates {
 
 
 
+type MyNetwork = graph!(A ---X--- A with VertexAttributeCollectionType = VertexCoordinates);
+
+
+
 
 
 fn main() {
-    let mut g: graph!(A ---X--- A with VertexAttributeCollectionType = VertexCoordinates) = Graph::new();
+    let mut g  = MyNetwork::new();
     g.add_v(None);
     g.v_attrs_mut(&0).unwrap().x = 2;
     println!("{} {}", g.v_attrs(&0).unwrap().x, g.v_attrs(&0).unwrap().y);

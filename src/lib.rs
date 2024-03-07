@@ -1269,9 +1269,13 @@ macro_rules! graph_type_recognition_assistant {
 macro_rules! graph {
     (X ---X--- X with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                (),
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1279,9 +1283,13 @@ macro_rules! graph {
 
     (X ---X--- X) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                (),
+                (),
+                usize
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1289,9 +1297,13 @@ macro_rules! graph {
 
     (A ---X--- A with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1299,9 +1311,13 @@ macro_rules! graph {
 
     (A ---X--- A) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                (),
+                DynamicDispatchAttributeMap<String>,
+                usize
+            >,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1309,9 +1325,13 @@ macro_rules! graph {
 
     (X ---A--- X with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1319,9 +1339,13 @@ macro_rules! graph {
 
     (X ---A--- X) => {
         Graph<
-            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                DynamicDispatchAttributeMap<String>,
+                (),
+                usize
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1329,9 +1353,13 @@ macro_rules! graph {
 
     (A ---A--- A with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1339,9 +1367,13 @@ macro_rules! graph {
 
     (A ---A--- A) => {
         Graph<
-            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleUndirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleUndirectedLocale<
+                DynamicDispatchAttributeMap<String>,
+                DynamicDispatchAttributeMap<String>,
+                usize
+            >,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1349,9 +1381,13 @@ macro_rules! graph {
 
     (X ---X--> X with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                (),
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1359,9 +1395,13 @@ macro_rules! graph {
 
     (X ---X--> X) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                (),
+                (),
+                usize
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1369,9 +1409,13 @@ macro_rules! graph {
 
     (A ---X--> A with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1379,9 +1423,13 @@ macro_rules! graph {
 
     (A ---X--> A) => {
         Graph<
-            /* EdgeAttributeType */ (),
+            /* EdgeAttributeCollectionType */ (),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                (),
+                DynamicDispatchAttributeMap<String>,
+                usize
+            >,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1389,9 +1437,13 @@ macro_rules! graph {
 
     (X ---A--> X with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                (),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1399,9 +1451,13 @@ macro_rules! graph {
 
     (X ---A--> X) => {
         Graph<
-            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                DynamicDispatchAttributeMap<String>,
+                (),
+                usize
+            >,
             /* VertexAttributeCollectionType */ (),
             /* VertexIdType */ usize
         >
@@ -1409,9 +1465,13 @@ macro_rules! graph {
 
     (A ---A--> A with $($property:ident = $value:ty),+) => {
         Graph<
-            /* EdgeAttributeType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeType, DynamicDispatchAttributeMap<String>),
+            /* EdgeAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                graph_type_recognition_assistant!([$($property = $value),+], EdgeAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
+                graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
+            >,
             /* VertexAttributeCollectionType */ graph_type_recognition_assistant!([$($property = $value),+], VertexAttributeCollectionType, DynamicDispatchAttributeMap<String>),
             /* VertexIdType */ graph_type_recognition_assistant!([$($property = $value),+], VertexIdType, usize)
         >
@@ -1419,9 +1479,13 @@ macro_rules! graph {
 
     (A ---A--> A) => {
         Graph<
-            /* EdgeAttributeType */ DynamicDispatchAttributeMap<String>,
+            /* EdgeAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* EdgeIdType */ u8,
-            /* LocaleType */ SimpleDirectedLocale<_, _, _>,
+            /* LocaleType */ SimpleDirectedLocale<
+                DynamicDispatchAttributeMap<String>,
+                DynamicDispatchAttributeMap<String>,
+                usize
+            >,
             /* VertexAttributeCollectionType */ DynamicDispatchAttributeMap<String>,
             /* VertexIdType */ usize
         >
@@ -1459,6 +1523,26 @@ mod tests {
             VertexAttributeCollectionType = ()
         ) = Graph::new();
         assert_eq!(g.add_v(None), -128);
+    }
+
+    #[test]
+    fn graph_new_all() {
+        let _g: graph!(X ---X--- X) = Graph::new();
+        let _g: graph!(A ---X--- A) = Graph::new();
+        let _g: graph!(X ---A--- X) = Graph::new();
+        let _g: graph!(A ---A--- A) = Graph::new();
+        let _g: graph!(X ---X--> X) = Graph::new();
+        let _g: graph!(A ---X--> A) = Graph::new();
+        let _g: graph!(X ---A--> X) = Graph::new();
+        let _g: graph!(A ---A--> A) = Graph::new();
+        let _g: graph!(X ---X--- X with VertexIdType = i8) = Graph::new();
+        let _g: graph!(A ---X--- A with VertexIdType = i8) = Graph::new();
+        let _g: graph!(X ---A--- X with VertexIdType = i8) = Graph::new();
+        let _g: graph!(A ---A--- A with VertexIdType = i8) = Graph::new();
+        let _g: graph!(X ---X--> X with VertexIdType = i8) = Graph::new();
+        let _g: graph!(A ---X--> A with VertexIdType = i8) = Graph::new();
+        let _g: graph!(X ---A--> X with VertexIdType = i8) = Graph::new();
+        let _g: graph!(A ---A--> A with VertexIdType = i8) = Graph::new();
     }
 
     #[test]
