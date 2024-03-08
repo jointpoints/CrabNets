@@ -71,69 +71,6 @@ where
     /// [add_e]: crate::BasicMutableGraph::add_e
     /// [kinds]: crate::Graph#different-kinds-of-graphs
     fn add_e(&mut self, id2: VertexIdType, relation: EdgeToVertexRelation, edge_id: Option<EdgeIdType>, store_edge_attributes: bool) -> EdgeIdType;
-    /// # Number of incident edges
-    /// 
-    /// ## Description
-    /// Get the number of edges incident on the vertex associated with this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `usize` - the number of incident edges.
-    /// 
-    /// ## Details
-    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
-    /// method and [`Locale::count_neighbours`].
-    fn count_incident_e(&self) -> usize;
-    /// # Number of incoming incident edges
-    /// 
-    /// ## Description
-    /// Get the number of incoming edges incident on the  vertex  associated  with  this
-    /// locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `usize` - the number of incoming incident edges.
-    /// 
-    /// ## Details
-    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
-    /// method and [`Locale::count_neighbours_in`].
-    fn count_incident_e_in(&self) -> usize;
-    /// # Number of outgoing incident edges
-    /// 
-    /// ## Description
-    /// Get the number of outgoing edges incident on the  vertex  associated  with  this
-    /// locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `usize` - the number of outgoing incident edges.
-    /// 
-    /// ## Details
-    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
-    /// method and [`Locale::count_neighbours_out`].
-    fn count_incident_e_out(&self) -> usize;
-    /// # Number of undirected incident edges
-    /// 
-    /// ## Description
-    /// Get the number of undirected edges incident on the vertex associated  with  this
-    /// locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `usize` - the number of undirected incident edges.
-    /// 
-    /// ## Details
-    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
-    /// method and [`Locale::count_neighbours_undir`].
-    fn count_incident_e_undir(&self) -> usize;
     /// # Number of neighbours
     /// 
     /// ## Description
@@ -149,7 +86,7 @@ where
     /// Each adjacent vertex is only counted once, regardless of the number of  parallel
     /// edges connecting it and their direction. Mind the difference between this method
     /// and [`Locale::count_incident_e`].
-    fn count_neighbours(&self) -> usize;
+    fn count_adjacent(&self) -> usize;
     /// # Number of 'incoming' neighbours
     /// 
     /// ## Description
@@ -165,7 +102,7 @@ where
     /// ## Details
     /// Each adjacent vertex is only counted once, regardless of the number of  parallel
     /// edges connecting it.
-    fn count_neighbours_in(&self) -> usize;
+    fn count_adjacent_in(&self) -> usize;
     /// # Number of 'outgoing' neighbours
     /// 
     /// ## Description
@@ -181,7 +118,7 @@ where
     /// ## Details
     /// Each adjacent vertex is only counted once, regardless of the number of  parallel
     /// edges connecting it.
-    fn count_neighbours_out(&self) -> usize;
+    fn count_adjacent_out(&self) -> usize;
     /// # Number of 'undirected' neighbours
     /// 
     /// ## Description
@@ -197,7 +134,70 @@ where
     /// ## Details
     /// Each adjacent vertex is only counted once, regardless of the number of  parallel
     /// edges connecting it.
-    fn count_neighbours_undir(&self) -> usize;
+    fn count_adjacent_undir(&self) -> usize;
+    /// # Number of incident edges
+    /// 
+    /// ## Description
+    /// Get the number of edges incident on the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `usize` - the number of incident edges.
+    /// 
+    /// ## Details
+    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
+    /// method and [`Locale::count_adjacent`].
+    fn count_incident_e(&self) -> usize;
+    /// # Number of incoming incident edges
+    /// 
+    /// ## Description
+    /// Get the number of incoming edges incident on the  vertex  associated  with  this
+    /// locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `usize` - the number of incoming incident edges.
+    /// 
+    /// ## Details
+    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
+    /// method and [`Locale::count_adjacent_in`].
+    fn count_incident_e_in(&self) -> usize;
+    /// # Number of outgoing incident edges
+    /// 
+    /// ## Description
+    /// Get the number of outgoing edges incident on the  vertex  associated  with  this
+    /// locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `usize` - the number of outgoing incident edges.
+    /// 
+    /// ## Details
+    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
+    /// method and [`Locale::count_adjacent_out`].
+    fn count_incident_e_out(&self) -> usize;
+    /// # Number of undirected incident edges
+    /// 
+    /// ## Description
+    /// Get the number of undirected edges incident on the vertex associated  with  this
+    /// locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `usize` - the number of undirected incident edges.
+    /// 
+    /// ## Details
+    /// Each parallel edge is counted  separately.  Mind  the  difference  between  this
+    /// method and [`Locale::count_adjacent_undir`].
+    fn count_incident_e_undir(&self) -> usize;
     /// # Immutable reference to edge attributes
     /// 
     /// ## Description
@@ -241,6 +241,57 @@ where
     /// [attrs]: crate::attributes::AttributeCollection
     /// [e_attrs_mut]: crate::BasicMutableGraph::e_attrs_mut
     fn e_attrs_mut(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> Option<&mut EdgeAttributeCollectionType>;
+    /// # Iterate over neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices adjacent to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>`  -  an  iterator  over  all  adjacent
+    /// vertices.
+    fn iter_adjacent<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'incoming' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a source of at least one  directed  edge
+    /// connecting them to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'incoming'
+    /// adjacent vertices.
+    fn iter_adjacent_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'outgoing' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a target of at least one  directed  edge
+    /// connecting them to the vertex associated with this locale.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'outgoing'
+    /// adjacent vertices.
+    fn iter_adjacent_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
+    /// # Iterate over 'undirected' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that are connected to the vertex associated with  this
+    /// locale by at least one undirected edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// 
+    /// ## Returns
+    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an iterator over  all  'undirected'
+    /// adjacent vertices.
+    fn iter_adjacent_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     /// # Edge direction
     /// 
     /// ## Description
@@ -339,57 +390,6 @@ where
     where
         EdgeIdType: 'a,
         VertexIdType: 'a;
-    /// # Iterate over neighbours
-    /// 
-    /// ## Description
-    /// Iterate over all vertices adjacent to the vertex associated with this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `Box<dyn Iterator<Item = VertexIdType>>`  -  an  iterator  over  all  adjacent
-    /// vertices.
-    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    /// # Iterate over 'incoming' neighbours
-    /// 
-    /// ## Description
-    /// Iterate over all vertices that serve as a source of at least one  directed  edge
-    /// connecting them to the vertex associated with this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'incoming'
-    /// adjacent vertices.
-    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    /// # Iterate over 'outgoing' neighbours
-    /// 
-    /// ## Description
-    /// Iterate over all vertices that serve as a target of at least one  directed  edge
-    /// connecting them to the vertex associated with this locale.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an  iterator  over  all  'outgoing'
-    /// adjacent vertices.
-    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
-    /// # Iterate over 'undirected' neighbours
-    /// 
-    /// ## Description
-    /// Iterate over all vertices that are connected to the vertex associated with  this
-    /// locale by at least one undirected edge.
-    /// 
-    /// ## Arguments
-    /// * `&self` - an immutable reference to the caller.
-    /// 
-    /// ## Returns
-    /// * `Box<dyn Iterator<Item = VertexIdType>>` - an iterator over  all  'undirected'
-    /// adjacent vertices.
-    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a>;
     fn new(associated_vertex_id: VertexIdType) -> Self;
     fn remove_e(&mut self, id2: &VertexIdType, edge_id: &EdgeIdType) -> bool;
     fn remove_neighbour(&mut self, id2: &VertexIdType) -> bool;
@@ -454,6 +454,26 @@ where
     }
 
     #[inline]
+    fn count_adjacent(&self) -> usize {
+        self.edges.len()
+    }
+
+    #[inline]
+    fn count_adjacent_in(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn count_adjacent_out(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn count_adjacent_undir(&self) -> usize {
+        self.edges.len()
+    }
+
+    #[inline]
     fn count_incident_e(&self) -> usize {
         self.edges.len()
     }
@@ -470,26 +490,6 @@ where
 
     #[inline]
     fn count_incident_e_undir(&self) -> usize {
-        self.edges.len()
-    }
-
-    #[inline]
-    fn count_neighbours(&self) -> usize {
-        self.edges.len()
-    }
-
-    #[inline]
-    fn count_neighbours_in(&self) -> usize {
-        0
-    }
-
-    #[inline]
-    fn count_neighbours_out(&self) -> usize {
-        0
-    }
-
-    #[inline]
-    fn count_neighbours_undir(&self) -> usize {
         self.edges.len()
     }
 
@@ -579,22 +579,22 @@ where
     }
 
     #[inline]
-    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges.keys().cloned())
     }
 
     #[inline]
-    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(empty())
     }
 
     #[inline]
-    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(empty())
     }
 
     #[inline]
-    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges.keys().cloned())
     }
 
@@ -676,6 +676,26 @@ where
     }
 
     #[inline]
+    fn count_adjacent(&self) -> usize {
+        self.edges.incoming.len() + self.edges.outgoing.len() + self.edges.undirected.len()
+    }
+
+    #[inline]
+    fn count_adjacent_in(&self) -> usize {
+        self.edges.incoming.len()
+    }
+
+    #[inline]
+    fn count_adjacent_out(&self) -> usize {
+        self.edges.outgoing.len()
+    }
+
+    #[inline]
+    fn count_adjacent_undir(&self) -> usize {
+        self.edges.undirected.len()
+    }
+
+    #[inline]
     fn count_incident_e(&self) -> usize {
         self.edges.incoming.len() + self.edges.outgoing.len() + self.edges.undirected.len()
     }
@@ -692,26 +712,6 @@ where
 
     #[inline]
     fn count_incident_e_undir(&self) -> usize {
-        self.edges.undirected.len()
-    }
-
-    #[inline]
-    fn count_neighbours(&self) -> usize {
-        self.edges.incoming.len() + self.edges.outgoing.len() + self.edges.undirected.len()
-    }
-
-    #[inline]
-    fn count_neighbours_in(&self) -> usize {
-        self.edges.incoming.len()
-    }
-
-    #[inline]
-    fn count_neighbours_out(&self) -> usize {
-        self.edges.outgoing.len()
-    }
-
-    #[inline]
-    fn count_neighbours_undir(&self) -> usize {
         self.edges.undirected.len()
     }
 
@@ -850,7 +850,7 @@ where
     }
 
     #[inline]
-    fn iter_neighbours<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges
             .incoming
             .iter()
@@ -871,17 +871,17 @@ where
     }
 
     #[inline]
-    fn iter_neighbours_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_in<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges.incoming.iter().cloned())
     }
 
     #[inline]
-    fn iter_neighbours_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_out<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges.outgoing.keys().cloned())
     }
 
     #[inline]
-    fn iter_neighbours_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
+    fn iter_adjacent_undir<'a>(&'a self) -> Box<dyn Iterator<Item = VertexIdType> + 'a> {
         Box::new(self.edges.undirected.keys().cloned())
     }
 

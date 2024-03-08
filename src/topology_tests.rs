@@ -66,7 +66,7 @@ where
         while !unvisited_vertices.is_empty() {
             let curr_vertex_id = unvisited_vertices.pop_front().unwrap();
             visited_vertices.insert(curr_vertex_id.clone());
-            unvisited_vertices.extend(self.edge_list.get(&curr_vertex_id).unwrap().iter_neighbours().filter(|x| !visited_vertices.contains(x)));
+            unvisited_vertices.extend(self.edge_list.get(&curr_vertex_id).unwrap().iter_adjacent().filter(|x| !visited_vertices.contains(x)));
         }
         visited_vertices.len() == self.count_v()
     }

@@ -239,6 +239,26 @@ where
     }
 
     #[inline]
+    fn iter_adjacent<'a>(&'a self, id: &T::VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = T::VertexIdType> + 'a>> {
+        self.unwrap().iter_adjacent(id)
+    }
+
+    #[inline]
+    fn iter_adjacent_in<'a>(&'a self, id: &T::VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = T::VertexIdType> + 'a>> {
+        self.unwrap().iter_adjacent_in(id)
+    }
+
+    #[inline]
+    fn iter_adjacent_out<'a>(&'a self, id: &T::VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = T::VertexIdType> + 'a>> {
+        self.unwrap().iter_adjacent_out(id)
+    }
+
+    #[inline]
+    fn iter_adjacent_undir<'a>(&'a self, id: &T::VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = T::VertexIdType> + 'a>> {
+        self.unwrap().iter_adjacent_undir(id)
+    }
+
+    #[inline]
     fn iter_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<T::EdgeIdType, T::VertexIdType>> + 'a> {
         self.unwrap().iter_e()
     }
@@ -448,6 +468,66 @@ where
     /// [Details]: #e-attrs-details
     /// [kinds]: Graph#different-kinds-of-graphs
     fn e_attrs(&self, id1: &VertexIdType, id2: &VertexIdType, edge_id: &EdgeIdType) -> CrabNetsResult<&EdgeAttributeCollectionType>;
+    /// # Iterate over neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices adjacent to the given vertex.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// *  `CrabNetsResult<Box<dyn Iterator<Item = VertexIdType>>>`  -  `Ok(value)`   is
+    /// returned if the vertex with the given ID exists, `value`  in  this  case  is  an
+    /// iterator over all adjacent vertices; `Err(_)` is returned otherwise.
+    fn iter_adjacent<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>>;
+    /// # Iterate over 'incoming' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a source of at least one  directed  edge
+    /// connecting them to the given vertex.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// *  `CrabNetsResult<Box<dyn Iterator<Item = VertexIdType>>>`  -  `Ok(value)`   is
+    /// returned if the vertex with the given ID exists, `value`  in  this  case  is  an
+    /// iterator over all 'incoming' adjacent vertices; `Err(_)` is returned otherwise.
+    fn iter_adjacent_in<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>>;
+    /// # Iterate over 'outgoing' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that serve as a target of at least one  directed  edge
+    /// connecting them to the given vertex.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// *  `CrabNetsResult<Box<dyn Iterator<Item = VertexIdType>>>`  -  `Ok(value)`   is
+    /// returned if the vertex with the given ID exists, `value`  in  this  case  is  an
+    /// iterator over all 'outgoing' adjacent vertices; `Err(_)` is returned otherwise.
+    fn iter_adjacent_out<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>>;
+    /// # Iterate over 'undirected' neighbours
+    /// 
+    /// ## Description
+    /// Iterate over all vertices that are connected to the given vertex by at least one
+    /// undirected edge.
+    /// 
+    /// ## Arguments
+    /// * `&self` - an immutable reference to the caller.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
+    /// 
+    /// ## Returns
+    /// *  `CrabNetsResult<Box<dyn Iterator<Item = VertexIdType>>>`  -  `Ok(value)`   is
+    /// returned if the vertex with the given ID exists, `value`  in  this  case  is  an
+    /// iterator  over  all  'undirected'  adjacent  vertices;  `Err(_)`   is   returned
+    /// otherwise.
+    fn iter_adjacent_undir<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>>;
     /// # Iterate over edges
     /// 
     /// ## Description
@@ -480,7 +560,7 @@ where
     /// 
     /// ## Arguments
     /// * `&self` - an immutable reference to the caller.
-    /// * `id` : `VertexIdType` - an immutable reference to the ID of interest.
+    /// * `id` : `&VertexIdType` - an immutable reference to the ID of interest.
     /// 
     /// ## Returns
     /// * `CrabNetsResult<&VertexAttributeCollectionType>` - `Ok(value)` is returned  if
@@ -914,6 +994,43 @@ where
         }
     }
 
+    fn iter_adjacent<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::iter_adjacent";
+        if self.contains_v(id) {
+            Ok(self.edge_list.get(id).unwrap().iter_adjacent())
+        } else {
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
+    }
+
+    fn iter_adjacent_in<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::iter_adjacent_in";
+        if self.contains_v(id) {
+            Ok(self.edge_list.get(id).unwrap().iter_adjacent_in())
+        } else {
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
+    }
+
+    fn iter_adjacent_out<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::iter_adjacent_out";
+        if self.contains_v(id) {
+            Ok(self.edge_list.get(id).unwrap().iter_adjacent_out())
+        } else {
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
+    }
+
+    fn iter_adjacent_undir<'a>(&'a self, id: &VertexIdType) -> CrabNetsResult<Box<dyn Iterator<Item = VertexIdType> + 'a>> {
+        const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::iter_adjacent_undir";
+        if self.contains_v(id) {
+            Ok(self.edge_list.get(id).unwrap().iter_adjacent_undir())
+        } else {
+            Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id)))
+        }
+    }
+
+    #[inline]
     fn iter_e<'a>(&'a self) -> Box<dyn Iterator<Item = EdgeIteratorItem<EdgeIdType, VertexIdType>> + 'a> {
         Box::new(self.edge_list.iter().map(|(_, x)| x.iter_incident_e_with_attrs()).flatten())
     }
@@ -936,7 +1053,7 @@ where
     fn v_degree(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree";
         match self.edge_list.get(id) {
-            Some(value) => Ok(value.count_neighbours()),
+            Some(value) => Ok(value.count_adjacent()),
             None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
@@ -945,7 +1062,7 @@ where
     fn v_degree_in(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_in";
         match self.edge_list.get(id) {
-            Some(value) => Ok(value.count_neighbours_in()),
+            Some(value) => Ok(value.count_adjacent_in()),
             None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
@@ -954,7 +1071,7 @@ where
     fn v_degree_out(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_out";
         match self.edge_list.get(id) {
-            Some(value) => Ok(value.count_neighbours_out()),
+            Some(value) => Ok(value.count_adjacent_out()),
             None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
@@ -963,7 +1080,7 @@ where
     fn v_degree_undir(&self, id: &VertexIdType) -> CrabNetsResult<usize> {
         const FUNCTION_PATH: &str = "Graph::BasicImmutableGraph::v_degree_undir";
         match self.edge_list.get(id) {
-            Some(value) => Ok(value.count_neighbours_undir()),
+            Some(value) => Ok(value.count_adjacent_undir()),
             None => Err(CrabNetsError::new(FUNCTION_PATH, format!("Vertex with ID {} doesn't exist.", id))),
         }
     }
@@ -1546,7 +1663,7 @@ mod tests {
     }
 
     #[test]
-    fn add_degree_delete() {
+    fn basic_vertex_and_edge_operations() {
         // Undirected simple unattributed graph
         let mut g: graph!(X ---X--- X) = Graph::new();
         // Add vertices
@@ -1582,5 +1699,9 @@ mod tests {
         assert_eq!(g.add_v(None), 3);
         assert_eq!(g.count_v(), 5);
         assert_eq!(g.count_e(), 1);
+        // Iterate over neighbours
+        assert!(g.iter_adjacent(&2).is_ok_and(|x| x.collect::<Vec<_>>() == vec![218]));
+        assert!(g.iter_adjacent(&3).is_ok_and(|x| x.collect::<Vec<_>>() == vec![0usize; 0]));
+        assert!(g.iter_adjacent_out(&2).is_ok_and(|x| x.collect::<Vec<_>>() == vec![0usize; 0]));
     }
 }
