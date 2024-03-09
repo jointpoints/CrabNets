@@ -180,10 +180,10 @@ where
     EdgeIdType: Id,
     VertexIdType: Id,
 {
-    direction: EdgeDirection,
-    edge_id: EdgeIdType,
-    id1: VertexIdType,
-    id2: VertexIdType,
+    pub direction: EdgeDirection,
+    pub edge_id: EdgeIdType,
+    pub id1: VertexIdType,
+    pub id2: VertexIdType,
 }
 
 
