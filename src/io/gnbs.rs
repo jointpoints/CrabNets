@@ -655,7 +655,7 @@ impl Writer for GNBSWriter {
 b"# GNBS serialisation of a graph
 # 
 # GNBS format specification:
-#     ...
+#     https://github.com/jointpoints/GNBSFormat/blob/main/Specification.md
 
 # VERTEX ATTRIBUTES
 ";
@@ -677,6 +677,7 @@ b"# GNBS serialisation of a graph
             buffer_writer.write(format!("V {}", id).as_bytes()).unwrap();
             for attribute in vertex_attributes.iter() {
                 buffer_writer.write(match graph.v_attrs(&id).unwrap().io_query_contents(&attribute.name) {
+                    Some(StaticDispatchAttributeValue::Bool(value)) => format!(" {}", if value { "T" } else { "F" }),
                     Some(value) => format!(" {:?}", value),
                     None => " X".to_string()
                 }.as_bytes()).unwrap();
@@ -699,6 +700,7 @@ b"# GNBS serialisation of a graph
             buffer_writer.write(if edge.direction == EdgeDirection::Undirected { format!("E {} {}", edge.id1, edge.id2) } else { format!("A {} {}", edge.id1, edge.id2) }.as_bytes()).unwrap();
             for attribute in edge_attributes.iter() {
                 buffer_writer.write(match graph.e_attrs(&edge.id1, &edge.id2, &edge.edge_id).unwrap().io_query_contents(&attribute.name) {
+                    Some(StaticDispatchAttributeValue::Bool(value)) => format!(" {}", if value { "T" } else { "F" }),
                     Some(value) => format!(" {:?}", value),
                     None => " X".to_string()
                 }.as_bytes()).unwrap();
@@ -759,12 +761,34 @@ mod tests {
     }
 
     #[test]
+    fn read_from_gnbs3() {
+        const INPUT: &str = "
+        # Test number 3
+        AV B is valid ;)
+        V 1 X
+        V 3 T
+        V 2 F
+        E 1 2
+        E 2 3
+        ";
+        let buffer_reader = BufReader::new(INPUT.as_bytes());
+        let gnbs_reader = GNBSReader;
+        let g: graph!(A ---X--- A);
+        let g_result = gnbs_reader.read_graph(buffer_reader);
+        assert!(g_result.is_ok());
+        g = g_result.unwrap();
+        assert_eq!(g.count_v(), 3);
+        assert_eq!(g.count_e(), 2);
+        assert_eq!(g.v_attrs(&3).unwrap().get(&"is valid ;)".to_string()).unwrap().downcast::<bool>().unwrap(), &true);
+    }
+
+    #[test]
     fn write_to_gnbs1() {
         const OUTPUT: &[u8] =
 b"# GNBS serialisation of a graph
 # 
 # GNBS format specification:
-#     ...
+#     https://github.com/jointpoints/GNBSFormat/blob/main/Specification.md
 
 # VERTEX ATTRIBUTES
 AV LS Names
@@ -789,7 +813,7 @@ E 1 2
         g.add_v(None);
         g.add_e(&1, &2, true, None).unwrap();
         g.add_e(&0, &1, false, None).unwrap();
-        let mut output = vec![0u8; 500];
+        let mut output = vec![0u8; 1000];
         {
             let mut cursor = Cursor::new(&mut output);
             let mut buffer_writer = BufWriter::new(&mut cursor);
