@@ -33,9 +33,9 @@ use std::{
     marker::PhantomData,
     ops::AddAssign,
 };
-use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
+pub use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{CrabNetsError, CrabNetsResult};
-use locales::*;
+pub use locales::*;
 
 
 
