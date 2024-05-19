@@ -1,5 +1,5 @@
 use std::iter::once;
-use crabnets::{*, io::{AttributeCollectionIO, AttributeToken}};
+use crabnets::{prelude::*, io::{AttributeCollectionIO, AttributeToken}};
 
 
 

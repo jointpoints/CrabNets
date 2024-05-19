@@ -7,11 +7,14 @@
 //! and manipulate graphs/networks.
 //! 
 //! ## Features
-//! * **Different families of graphs with unified interface**  Build  simple  graphs  or
-//! multi-graphs with directed or undirected edges and maniputate all of them  with  the
-//! same set of functions! [More about this...][kinds]
+//! * **Different families of graphs  with  one  interface**  Create  simple  graphs  or
+//! multi-graphs with directed or undirected edges and maniputate  them  with  the  same
+//! interface! [More about this...][kinds]
 //! * **Attributes** Add your custom attributes to vertices or edges  or  even  both  of
 //! them! [More about this...][attrs]
+//! * **Adaptive algorithms** Many implemented algorithms are adaptive, i.e. they choose
+//! their computational approaches based on the properties of the given graph trying  to
+//! minimise the expected computation time.
 //! 
 //! [kinds]: Graph#different-kinds-of-graphs
 //! [attrs]: Graph#attributes
@@ -24,6 +27,7 @@ pub mod attributes;
 pub mod errors;
 pub mod io;
 pub mod locales;
+pub mod prelude;
 pub mod topology_tests;
 
 use std::{
@@ -33,9 +37,10 @@ use std::{
     marker::PhantomData,
     ops::AddAssign,
 };
-pub use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
+use bitflags::bitflags;
+use attributes::{AttributeCollection, DynamicDispatchAttributeMap, StaticDispatchAttributeValue};
 use errors::{CrabNetsError, CrabNetsResult};
-pub use locales::*;
+use locales::*;
 
 
 
@@ -184,6 +189,81 @@ where
     pub edge_id: EdgeIdType,
     pub id1: VertexIdType,
     pub id2: VertexIdType,
+}
+
+
+
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+// * GRAPH CONTAINERS                                                                  *
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+bitflags! {
+    /// # Hints
+    /// 
+    /// ## Description
+    /// **Hints** are a helpful tool that allows users to control the flow of the
+    /// adaptive algorithms implemented in CrabNets.
+    /// 
+    /// ## Adaptive algorithms
+    /// _Adaptive  algorithms_  automatically  adjust  their  computational  tactics  to
+    /// minimise their running time for _most_ cases.  However,  nothing  can  guarantee
+    /// that the runtime will be minimum in _all_ cases, because  the  tactic  for  each
+    /// specific graph is _guessed_ depending on whether it has any  of  the  properties
+    /// that are likely to reduce the computational effort.
+    ///
+    /// Some of these properties are trivial to check (e.g. whether the graph  is  large
+    /// or small, whether the graph is sparse or dense, etc.), and some  are  much  more
+    /// complex. If the user knows in advance about such complex properties of the input
+    /// graph, they're encouraged to hint at them by passing the `Hints` instance as the
+    /// value of the `given_hints` argument of the called function.
+    /// 
+    /// `Hints` work as bitfields. For example, if you know that the input graph is both
+    /// connected      and      planar,      you      can      express      this      as
+    /// `Hints::CONNECTED | Hints::PLANAR`.
+    /// 
+    /// If you don't want to hint at anything,  the  value  `Hints::empty()`  should  be
+    /// passed for the `given_hints` argument.
+    /// 
+    /// ## Hints enforcement
+    /// By default, CrabNets doesn't trust the hints blindly and checks them to be  sure
+    /// that they're correct.  This  adds  a  level  of  security  to  the  system  but,
+    /// unfortunately, slows down the process.
+    /// 
+    /// If the user is confident about the validity of their hints, there's an option to
+    /// _force_ the algorithm to follow the hints  without  verifying  them.  This  will
+    /// speed up the computation, however, if the hints end up  being  misleading  (e.g.
+    /// the input graph contains a cycle but the user claims it to be a tree), then  the
+    /// output of the algorithm _can be wrong_!
+    /// 
+    /// If you wish to enforce  the  hints,  set  the  value  of  the  `that_are_forced`
+    /// argument of the called function to `true`. Otherwise, set it to `false`.
+    /// 
+    /// If you don't give any hints, the value of `that_are_forced` will be ignored.
+    pub struct Hints: u32 {
+        /// Hints at the fact that there're no cycles in the graph.
+        /// Implies `Hints::LOW_TREEWIDTH`.
+        const ACYCLIC = (1 << 0) + Hints::LOW_TREEWIDTH.bits();
+        /// Hints at the fact that the graph is connected.
+        const CONNECTED = 1 << 1;
+        /// Hints at the fact that the graph is a forest.
+        /// Implies `Hints::ACYCLIC` and `Hints::PLANAR`.
+        const FOREST = (1 << 2) + Hints::ACYCLIC.bits() + Hints::PLANAR.bits();
+        /// Hints at the fact that the graph has low treewidth. We recommend to
+        /// interpret this as 'the treewidth is at most 3'.
+        const LOW_TREEWIDTH = 1 << 3;
+        /// Hints at the fact that the graph is planar.
+        const PLANAR = 1 << 4;
+        /// Hints at the fact that the graph is strongly connected.
+        /// Implies `Hints::CONNECTED`.
+        const STRONGLY_CONNECTED = (1 << 5) + Hints::CONNECTED.bits();
+        /// Hints at the fact that the graph is a tree.
+        /// Implies `Hints::FOREST` and `Hints::STRONGLY_CONNECTED`.
+        const TREE = Hints::FOREST.bits() + Hints::STRONGLY_CONNECTED.bits();
+    }
 }
 
 
