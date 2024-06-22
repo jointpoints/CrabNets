@@ -4,17 +4,33 @@
 //! 
 //! ## Welcome!
 //! CrabNets is one of the few Rust libraries that enable developers to  build,  analyse
-//! and manipulate graphs/networks.
+//! and manipulate graphs/networks. The key ideas behind  the  development  of  CrabNets
+//! are:
+//! * 🛡️ **Save operations** We give you the possibility to create and  edit  graphs  in
+//! the memory-safe manner (as it should be in Rust).
+//! * 💿 **I/O friendliness** You can save and load graphs using multiple file formats.
+//! * ✂️ **Graph patitioning** Cut your huge networks into pieces and process each piece
+//! in its own thread separately from the others.
+//! * 🔗 **Readiness for advanced algorithms** You should be ready  to  write  algorithms
+//! for your graphs that rely, for example, on their complex decompositions.
 //! 
 //! ## Features
 //! * **Different families of graphs  with  one  interface**  Create  simple  graphs  or
 //! multi-graphs with directed or undirected edges and maniputate  them  with  the  same
 //! interface! [More about this...][kinds]
-//! * **Attributes** Add your custom attributes to vertices or edges  or  even  both  of
-//! them! [More about this...][attrs]
-//! * **Adaptive algorithms** Many implemented algorithms are adaptive, i.e. they choose
-//! their computational approaches based on the properties of the given graph trying  to
-//! minimise the expected computation time.
+//! * **Attributes** Add your custom attributes to vertices, edges or both of them!  The
+//! data you can store is only limited by Rust capabilities! [More about this...][attrs]
+//! 
+//! ## Quick start
+//! CrabNets are designed to be ready for complex tasks but it  doesn't  mean  that  you
+//! need to spend months to start working with  it  and  doing  some  relatively  simple
+//! things!
+//! 
+//! To begin using CrabNets, simply write the following `use` statement:
+//! 
+//! ```ignore
+//! use crabnets::prelude::*;
+//! ```
 //! 
 //! [kinds]: Graph#different-kinds-of-graphs
 //! [attrs]: Graph#attributes
@@ -202,7 +218,7 @@ where
 
 
 bitflags! {
-    /// # Hints
+    /// # Hints for adaptive algorithms
     /// 
     /// ## Description
     /// **Hints** are a helpful tool that allows users to control the flow of the
