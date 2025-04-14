@@ -1,9 +1,9 @@
-# CrabNets
+# Connecto.rs
 
 ![Version badge](https://img.shields.io/badge/version-0.1.0_pre--release-blue?style=for-the-badge)
 
 ## Welcome!
-CrabNets is one of the few Rust libraries that enable developers to  build,  analyse
+Connecto.rs is one of the few Rust libraries that enable developers to  build,  analyse
 and manipulate graphs/networks.
 
 ## Features
