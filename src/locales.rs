@@ -4,10 +4,10 @@
 //! Connecto.rs provides you with a number of fully implemented [locales][loc] that you can use out
 //! of the box.
 //! These are:
-//! * [`UndirectedSimpleLocale`] -- only undirected edges, no parallel edges.
-//! * `DirectedSimpleLocale` -- directed and undirected edges, no parallel edges.
-//! * `UndirectedMultiLocale` -- only undirected edges, possibly parallel edges.
-//! * `DirectedMultiLocale` -- directed and undirected edges, possibly parallel edges.
+//! * [`UndirectedSimpleLocale`] -- only undirected edges, no parallel edges, loops are allowed.
+//! * `DirectedSimpleLocale` -- directed and undirected edges, no parallel edges, loops are allowed.
+//! * `UndirectedMultiLocale` -- only undirected edges, possibly parallel edges, loops are allowed.
+//! * `DirectedMultiLocale` -- directed and undirected edges, possibly parallel edges, loops are allowed.
 //! 
 //! `DirectedMultiLocale` is a 'universal' locale type in the sense that all other locale types
 //! above are the special cases of it.
@@ -15,7 +15,7 @@
 //! usage (and in some cases, runtime).
 //! 
 //! [loc]: crate::Locale
-use std::{collections::HashMap, mem::replace, vec::IntoIter};
+use std::{collections::HashMap, iter::empty, mem::replace};
 use anyhow::*;
 use crate::{connecto_rs_error, ConnectorsError, Id, Locale};
 
@@ -45,30 +45,77 @@ pub struct UndirectedSimpleLocale<VertexType>
 
 impl<VertexType> Locale<VertexType> for UndirectedSimpleLocale<VertexType>
 {
+    #[inline]
     fn deregister_edge(&mut self, id: Id) {
-        self.neighbourhood.retain(|_, edge_id| *edge_id != id);
+        self.neighbourhood.retain(|_, eid| *eid != id);
     }
 
 
 
+    #[inline]
     fn expose(&self) -> &VertexType {
         &self.vertex
     }
 
 
 
+    #[inline]
     fn expose_mut(&mut self) -> &mut VertexType {
         &mut self.vertex
     }
 
 
 
-    fn iter_incident_edges(&self) -> IntoIter<Id> {
-        self.neighbourhood.values().cloned().collect::<Vec<_>>().into_iter()
+    #[inline]
+    fn is_registered(&self, eid: Id) -> bool {
+        self.neighbourhood.values().find(|inc_eid| **inc_eid == eid).is_some()
     }
 
 
 
+    #[inline]
+    fn is_registered_in(&self, _eid: Id) -> bool {
+        false
+    }
+
+
+
+    #[inline]
+    fn is_registered_out(&self, _eid: Id) -> bool {
+        false
+    }
+
+
+
+    #[inline]
+    fn iter_incident<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a> {
+        Box::new(self.neighbourhood.iter().map(|(&vid, &eid)| (vid, eid)))
+    }
+
+
+
+    #[inline]
+    fn iter_incident_in<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a> {
+        Box::new(empty::<(Id, Id)>())
+    }
+
+
+
+    #[inline]
+    fn iter_incident_out<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a> {
+        Box::new(empty::<(Id, Id)>())
+    }
+
+
+
+    #[inline]
+    fn iter_incident_undir<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a> {
+        Box::new(self.neighbourhood.iter().map(|(&vid, &eid)| (vid, eid)))
+    }
+
+
+
+    #[inline]
     fn leak(self) -> VertexType {
         self.vertex
     }
@@ -85,6 +132,7 @@ impl<VertexType> Locale<VertexType> for UndirectedSimpleLocale<VertexType>
 
 
 
+    #[inline]
     fn replace_vertex(&mut self, new_vertex: VertexType) -> VertexType {
         let old_vertex = replace(&mut self.vertex, new_vertex);
         old_vertex
@@ -92,6 +140,7 @@ impl<VertexType> Locale<VertexType> for UndirectedSimpleLocale<VertexType>
 
 
 
+    #[inline]
     fn with_vertex(vertex: VertexType) -> Self {
         UndirectedSimpleLocale { vertex, neighbourhood: HashMap::new() }
     }

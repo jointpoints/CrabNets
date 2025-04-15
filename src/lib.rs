@@ -37,7 +37,7 @@
 //!         (2, 0, 2, true),
 //!         (1, 3, 4, true),
 //!         (2, 3, 3, false)
-//!     ].into_iter()).unwrap();
+//!     ].into_iter());
 //!     assert_eq!(g.e().count(), 4);
 //!     // Find the shortest path
 //! }
@@ -53,7 +53,7 @@
 //! [step2]: graph!
 pub mod locales;
 
-use std::{collections::HashMap, error::Error, fmt::Display, marker::PhantomData, vec::IntoIter};
+use std::{collections::HashMap, error::Error, fmt::Display, marker::PhantomData};
 use anyhow::{Ok, Result};
 
 
@@ -190,21 +190,132 @@ pub trait Locale<VertexType>
 
 
 
-    /// # Iterate over IDs of incident edges
+    /// # Is edge registered?
     /// 
     /// ## Description
-    /// Returns an iterator over the IDs of all incident edges.
+    /// Checks if an edge with the given ID is registered in the locale.
     /// 
     /// ## ⚠ This is an under-the-hood function
     /// This function is **not** supposed to be called directly by the end user.
     /// It's typically called from the following user-level funtions:
-    /// * [`g.v().iter_incident_edges()`][iterincidentedges]
+    /// * [`g.e().is_incident()`][isinc]
     /// 
     /// Unless you try to implement your own locale type, consider calling one of the
     /// functions above.
     /// 
-    /// [iterincidentedges]: ImmutableVertexView::iter_incident_edges
-    fn iter_incident_edges(&self) -> IntoIter<Id>;
+    /// [isinc]: ImmutableEdgeView::is_incident
+    fn is_registered(&self, eid: Id) -> bool;
+
+
+
+    /// # Is edge registered as ingoing?
+    /// 
+    /// ## Description
+    /// Checks if an edge with the given ID is registered in the locale as ingoing.
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().is_incident_in()`][isincin]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [isincin]: ImmutableEdgeView::is_incident_in
+    fn is_registered_in(&self, eid: Id) -> bool;
+
+
+
+    /// # Is edge registered as outgoing?
+    /// 
+    /// ## Description
+    /// Checks if an edge with the given ID is registered in the locale as outgoing.
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().is_incident_out()`][isincout]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [isincout]: ImmutableEdgeView::is_incident_out
+    fn is_registered_out(&self, eid: Id) -> bool;
+
+
+
+    /// # Iterate over incident edges
+    /// 
+    /// ## Description
+    /// Returns an iterator over tuples (adjacent vertex ID, corresponding edge ID).
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().iter_incident()`][iterinc]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    fn iter_incident<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a>;
+
+
+
+    /// # Iterate over ingoing incident edges
+    /// 
+    /// ## Description
+    /// Returns an iterator over tuples (adjacent vertex ID, corresponding edge ID) where each edge
+    /// produced by an iterator is directed and the vertex from this locale is their target vertex.
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().iter_incident_in()`][iterincin]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    fn iter_incident_in<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a>;
+
+
+
+    /// # Iterate over outgoing incident edges
+    /// 
+    /// ## Description
+    /// Returns an iterator over tuples (adjacent vertex ID, corresponding edge ID) where each edge
+    /// produced by an iterator is directed and the vertex from this locale is their source vertex.
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().iter_incident_out()`][iterincout]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    fn iter_incident_out<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a>;
+
+
+
+    /// # Iterate over undirected incident edges
+    /// 
+    /// ## Description
+    /// Returns an iterator over tuples (adjacent vertex ID, corresponding edge ID) where each edge
+    /// produced by an iterator is undirected.
+    /// 
+    /// ## ⚠ This is an under-the-hood function
+    /// This function is **not** supposed to be called directly by the end user.
+    /// It's typically called from the following user-level funtions:
+    /// * [`g.e().iter_incident_undir()`][iterincundir]
+    /// 
+    /// Unless you try to implement your own locale type, consider calling one of the
+    /// functions above.
+    /// 
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    fn iter_incident_undir<'a>(&'a self) -> Box<dyn Iterator<Item = (Id, Id)> + 'a>;
 
 
 
@@ -544,8 +655,8 @@ where
         match self.g.locales.remove(&id) {
             Some(locale) => {
                 self.g.next_vertex_id = id;
-                for edge_id in locale.iter_incident_edges() {
-                    self.g.edges.remove(&edge_id);
+                for (_, eid) in locale.iter_incident() {
+                    self.g.edges.remove(&eid);
                 }
                 Some(locale.leak())
             },
@@ -628,9 +739,9 @@ where
     /// let mut g: graph!{[u8] ---[bool]---} = Graph::null();
     /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
     /// g.e_mut().add_from_iter([
-    ///     (0, 1, true, ()),
-    ///     (1, 2, false, ()),
-    ///     (2, 0, true, ()),
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, false),
+    ///     (2, 0, true, false),
     /// ].into_iter());
     /// assert_eq!(g.e().count(), 3);
     /// ```
@@ -642,8 +753,322 @@ where
 
 
     /// # Iterate over edges
-    pub fn iter(&self) -> _ {
-        self.g.edges.iter()
+    /// 
+    /// ## Description
+    /// Iterates over all edges in the graph.
+    /// Returns an iterator producing tuples (edge ID, vertex ID 1, vertex ID 2, &edge).
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]---} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, false),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges: Vec<_> = g.e().iter().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _, _)| *eid);
+    /// assert_eq!(edges, vec![(0, 0, 1, &true), (1, 1, 2, &false), (2, 2, 0, &true)]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter()`][mutiter] -- Same as this fucntion but with mutable edge references.
+    /// * [`g.e().iter_dir()`][iterdir] -- Iterates over all directed edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident()`][iterinc] -- Iterates over all edges incident on a specific
+    /// vertex.
+    /// * [`g.e().iter_incident_in()`][iterincin] -- Iterates over all directed edges going in a
+    /// specific vertex.
+    /// * [`g.e().iter_incident_out()`][iterincout] -- Iterates over all directed edges going out
+    /// of a specific vertex.
+    /// * [`g.e().iter_incident_undir()`][iterincundir] -- Iterates over all undirected edges
+    /// incident on a specific vertex.
+    /// 
+    /// [mutiter]: MutableEdgeView::iter
+    /// [iterdir]: ImmutableEdgeView::iter_dir
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    pub fn iter(&self) -> Box<dyn Iterator<Item = (Id, Id, Id, &'a EdgeType)> + 'a> {
+        Box::new(self.g.edges.iter().map(|(&eid, (vid1, vid2, edge))| (eid, *vid1, *vid2, edge)))
+    }
+
+
+
+    /// # Iterate over directed edges
+    /// 
+    /// ## Description
+    /// Iterates over all directed edges in the graph.
+    /// Returns an iterator producing tuples (edge ID, vertex ID 1, vertex ID 2, &edge).
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]-->} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, true),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges: Vec<_> = g.e().iter_dir().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _, _)| *eid);
+    /// assert_eq!(edges, vec![(1, 1, 2, &false)]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter_dir()`][mutiterdir] -- Same as this fucntion but with mutable edge
+    /// references.
+    /// * [`g.e().iter()`][iter] -- Iterates over all edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident()`][iterinc] -- Iterates over all edges incident on a specific
+    /// vertex.
+    /// * [`g.e().iter_incident_in()`][iterincin] -- Iterates over all directed edges going in a
+    /// specific vertex.
+    /// * [`g.e().iter_incident_out()`][iterincout] -- Iterates over all directed edges going out
+    /// of a specific vertex.
+    /// * [`g.e().iter_incident_undir()`][iterincundir] -- Iterates over all undirected edges
+    /// incident on a specific vertex.
+    /// 
+    /// [mutiterdir]: MutableEdgeView::iter_dir
+    /// [iter]: ImmutableEdgeView::iter
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    pub fn iter_dir(&self) -> Box<dyn Iterator<Item = (Id, Id, Id, &'a EdgeType)> + 'a> {
+        Box::new(self.g.edges
+            .iter()
+            .filter(|(eid, (vid1, _, _))| self.g.locales[vid1].is_registered_out(**eid))
+            .map(|(eid, (vid1, vid2, edge))| (*eid, *vid1, *vid2, edge))
+        )
+    }
+
+
+
+    /// # Iterate edges incident on vertex
+    /// 
+    /// ## Description
+    /// Iterates over all edges incident on the given vertex.
+    /// 
+    /// Returns `Ok(iterator)` if a vertex with the given ID exists.
+    /// In this case, `iterator` produces tuples (edge ID, adjacent vertex ID, &edge).
+    /// Otherwise, returns `Err(ConnectorsError)`.
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]---} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, false),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges = g.e().iter_incident(1).unwrap().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _)| *eid);
+    /// assert_eq!(edges, vec![(0, 0, &true), (1, 2, &false)]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter_incident()`][mutiterinc] -- Same as this fucntion but with mutable edge
+    /// references.
+    /// * [`g.e().iter()`][iter] -- Iterates over all edges in the graph.
+    /// * [`g.e().iter_dir()`][iterdir] -- Iterates over all directed edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident_in()`][iterincin] -- Iterates over all directed edges going in a
+    /// specific vertex.
+    /// * [`g.e().iter_incident_out()`][iterincout] -- Iterates over all directed edges going out
+    /// of a specific vertex.
+    /// * [`g.e().iter_incident_undir()`][iterincundir] -- Iterates over all undirected edges
+    /// incident on a specific vertex.
+    /// 
+    /// [mutiterinc]: MutableEdgeView::iter_incident
+    /// [iter]: ImmutableEdgeView::iter
+    /// [iterdir]: ImmutableEdgeView::iter_dir
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    pub fn iter_incident(&self, vid: Id) -> Result<Box<dyn Iterator<Item = (Id, Id, &'a EdgeType)> + 'a>> {
+        if self.g.locales.get(&vid).is_none() {
+            return connecto_rs_error!(format!("Cannot iterate over edges incident on vertex {} because it doesn't exist.", vid));
+        }
+        let locale = self.g.locales.get(&vid).unwrap();
+        Ok(Box::new(locale.iter_incident().map(|(vid, eid)| {
+            let (_, _, edge) = self.g.edges.get(&eid).unwrap();
+            (eid, vid, edge)
+        })))
+    }
+
+
+
+    /// # Iterate directed edges going in vertex
+    /// 
+    /// ## Description
+    /// Iterates over all directed edges for which the given vertex is the target vertex.
+    /// 
+    /// Returns `Ok(iterator)` if a vertex with the given ID exists.
+    /// In this case, `iterator` produces tuples (edge ID, adjacent vertex ID, &edge).
+    /// Otherwise, returns `Err(ConnectorsError)`.
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]-->} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, true),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges = g.e().iter_incident_in(1).unwrap().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _)| *eid);
+    /// assert_eq!(edges, vec![]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter_incident_in()`][mutiterincin] -- Same as this fucntion but with mutable
+    /// edge references.
+    /// * [`g.e().iter()`][iter] -- Iterates over all edges in the graph.
+    /// * [`g.e().iter_dir()`][iterdir] -- Iterates over all directed edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident()`][iterinc] -- Iterates over all edges incident on a specific
+    /// vertex.
+    /// * [`g.e().iter_incident_out()`][iterincout] -- Iterates over all directed edges going out
+    /// of a specific vertex.
+    /// * [`g.e().iter_incident_undir()`][iterincundir] -- Iterates over all undirected edges
+    /// incident on a specific vertex.
+    /// 
+    /// [mutiterincin]: MutableEdgeView::iter_incident_in
+    /// [iter]: ImmutableEdgeView::iter
+    /// [iterdir]: ImmutableEdgeView::iter_dir
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    pub fn iter_incident_in(&self, vid: Id) -> Result<Box<dyn Iterator<Item = (Id, Id, &'a EdgeType)> + 'a>> {
+        if self.g.locales.get(&vid).is_none() {
+            return connecto_rs_error!(format!("Cannot iterate over edges going in vertex {} because it doesn't exist.", vid));
+        }
+        let locale = self.g.locales.get(&vid).unwrap();
+        Ok(Box::new(locale.iter_incident_in().map(|(vid, eid)| {
+            let (_, _, edge) = self.g.edges.get(&eid).unwrap();
+            (eid, vid, edge)
+        })))
+    }
+
+
+
+    /// # Iterate directed edges going out of vertex
+    /// 
+    /// ## Description
+    /// Iterates over all directed edges for which the given vertex is the source vertex.
+    /// 
+    /// Returns `Ok(iterator)` if a vertex with the given ID exists.
+    /// In this case, `iterator` produces tuples (edge ID, adjacent vertex ID, &edge).
+    /// Otherwise, returns `Err(ConnectorsError)`.
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]-->} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, true),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges = g.e().iter_incident_out(1).unwrap().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _)| *eid);
+    /// assert_eq!(edges, vec![(1, 2, &false)]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter_incident_out()`][mutiterincout] -- Same as this fucntion but with
+    /// mutable edge references.
+    /// * [`g.e().iter()`][iter] -- Iterates over all edges in the graph.
+    /// * [`g.e().iter_dir()`][iterdir] -- Iterates over all directed edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident()`][iterinc] -- Iterates over all edges incident on a specific
+    /// vertex.
+    /// * [`g.e().iter_incident_in()`][iterincin] -- Iterates over all directed edges going in a
+    /// specific vertex.
+    /// * [`g.e().iter_incident_undir()`][iterincundir] -- Iterates over all undirected edges
+    /// incident on a specific vertex.
+    /// 
+    /// [mutiterincout]: MutableEdgeView::iter_incident_out
+    /// [iter]: ImmutableEdgeView::iter
+    /// [iterdir]: ImmutableEdgeView::iter_dir
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    /// [iterincundir]: ImmutableEdgeView::iter_incident_undir
+    pub fn iter_incident_out(&self, vid: Id) -> Result<Box<dyn Iterator<Item = (Id, Id, &'a EdgeType)> + 'a>> {
+        if self.g.locales.get(&vid).is_none() {
+            return connecto_rs_error!(format!("Cannot iterate over edges going out of vertex {} because it doesn't exist.", vid));
+        }
+        let locale = self.g.locales.get(&vid).unwrap();
+        Ok(Box::new(locale.iter_incident_out().map(|(vid, eid)| {
+            let (_, _, edge) = self.g.edges.get(&eid).unwrap();
+            (eid, vid, edge)
+        })))
+    }
+
+
+
+    /// # Iterate undirected edges incident on vertex
+    /// 
+    /// ## Description
+    /// Iterates over all undirected edges incident on the given vertex.
+    /// 
+    /// Returns `Ok(iterator)` if a vertex with the given ID exists.
+    /// In this case, `iterator` produces tuples (edge ID, adjacent vertex ID, &edge).
+    /// Otherwise, returns `Err(ConnectorsError)`.
+    /// 
+    /// ## Example
+    /// ```
+    /// let mut g: graph!{[u8] ---[bool]-->} = Graph::null();
+    /// g.v_mut().add_from_iter([1, 2, 4].into_iter());
+    /// g.e_mut().add_from_iter([
+    ///     (0, 1, true, false),
+    ///     (1, 2, false, true),
+    ///     (2, 0, true, false),
+    /// ].into_iter());
+    /// let mut edges = g.e().iter_incident_undir(1).unwrap().collect::<Vec<_>>();
+    /// edges.sort_by_key(|(eid, _, _)| *eid);
+    /// assert_eq!(edges, vec![(0, 0, &true)]);
+    /// ```
+    /// 
+    /// ## See also
+    /// * [`g.e_mut().iter_incident_undir()`][mutiterincundir] -- Same as this fucntion but with
+    /// mutable edge references.
+    /// * [`g.e().iter()`][iter] -- Iterates over all edges in the graph.
+    /// * [`g.e().iter_dir()`][iterdir] -- Iterates over all directed edges in the graph.
+    /// * [`g.e().iter_undir()`][iterundir] -- Iterates over all undirected edges in the graph.
+    /// * [`g.e().iter_incident()`][iterinc] -- Iterates over all edges incident on a specific
+    /// vertex.
+    /// * [`g.e().iter_incident_in()`][iterincin] -- Iterates over all directed edges going in a
+    /// specific vertex.
+    /// * [`g.e().iter_incident_out()`][iterincout] -- Iterates over all directed edges going out
+    /// of a specific vertex.
+    /// 
+    /// [mutiterincundir]: MutableEdgeView::iter_incident_undir
+    /// [iter]: ImmutableEdgeView::iter
+    /// [iterdir]: ImmutableEdgeView::iter_dir
+    /// [iterundir]: ImmutableEdgeView::iter_undir
+    /// [iterinc]: ImmutableEdgeView::iter_incident
+    /// [iterincin]: ImmutableEdgeView::iter_incident_in
+    /// [iterincout]: ImmutableEdgeView::iter_incident_out
+    pub fn iter_incident_undir(&self, vid: Id) -> Result<Box<dyn Iterator<Item = (Id, Id, &'a EdgeType)> + 'a>> {
+        if self.g.locales.get(&vid).is_none() {
+            return connecto_rs_error!(format!("Cannot iterate over undirected edges incident on vertex {} because it doesn't exist.", vid));
+        }
+        let locale = self.g.locales.get(&vid).unwrap();
+        Ok(Box::new(locale.iter_incident_undir().map(|(vid, eid)| {
+            let (_, _, edge) = self.g.edges.get(&eid).unwrap();
+            (eid, vid, edge)
+        })))
     }
 }
 
@@ -1020,5 +1445,24 @@ mod unit_tests {
         assert_eq!(g.v().count(), 3);
         g.v_mut().add_from_iter([(), ()].into_iter());
         assert_eq!(g.v().count(), 5);
+    }
+
+    #[test]
+    fn iter_edges() {
+        let mut g: Graph<bool, UndirectedSimpleLocale<u8>, u8> = Graph::null();
+        g.v_mut().add_from_iter([1, 2, 4].into_iter());
+        g.e_mut().add_from_iter([
+            (0, 1, true, false),
+            (1, 2, false, false),
+            (2, 0, true, false),
+        ].into_iter());
+        // iter
+        let mut edges = g.e().iter().collect::<Vec<_>>();
+        edges.sort_by_key(|(eid, _, _, _)| *eid);
+        assert_eq!(edges, vec![(0, 0, 1, &true), (1, 1, 2, &false), (2, 2, 0, &true)]);
+        // iter_incident
+        let mut edges = g.e().iter_incident(1).unwrap().collect::<Vec<_>>();
+        edges.sort_by_key(|(eid, _, _)| *eid);
+        assert_eq!(edges, vec![(0, 0, &true), (1, 2, &false)]);
     }
 }
