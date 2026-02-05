@@ -3,7 +3,7 @@
 ![Version badge](https://img.shields.io/badge/version-0.1.0_pre--release-blue?style=for-the-badge)
 
 ## Welcome!
-Connecto.rs is a fast Rust crate for graph manipulation with user-friendly interface.
+CONNECTO.RS is a fast Rust crate for graph manipulation with user-friendly interface.
 
 ## ⚡ Features
 * **🕸 Different categories of graphs.** CONNECTO.RS allow you to create and process both
