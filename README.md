@@ -13,7 +13,7 @@ CONNECTO.RS guarantee that every mutable argument of the said function will be i
 state.
 
 ## 🔍 Basic example
-```no_run
+```rust
 /* In this example, we'll compute the shortest path from A to D in the following directed
  * graph:
  *
@@ -27,7 +27,7 @@ state.
  *
  * The expected output is 8.
  */
-use connecto_rs::basics::*;
+use connecto_rs::essentials::*;
 
 fn main() {
     // g is our graph.

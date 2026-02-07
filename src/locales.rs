@@ -1,15 +1,28 @@
-use crate::{Id, RelativeEdgeDirection};
-use std::collections::HashSet;
+use crate::{AbsoluteEdgeDirection, Id, RelativeEdgeDirection};
+use std::{collections::HashSet, iter::empty};
+
+
+
+
+
+
+
+
+
+
 
 pub trait Locale<EdgeIdType>
 where
-    Self: Clone,
-    EdgeIdType: Id,
+Self: Clone,
+EdgeIdType: Id,
 {
     const IS_DIRECTED: bool;
     const IS_SIMPLE: bool;
     fn insert(&mut self, eid: EdgeIdType, reldir: RelativeEdgeDirection);
-    fn iter_all(&self) -> Box<dyn Iterator<Item = EdgeIdType> + '_>;
+    fn iter_all(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
+    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
+    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
+    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
     fn count_all(&self) -> usize;
     fn count_dir_from(&self) -> usize;
     fn count_dir_to(&self) -> usize;
@@ -18,17 +31,28 @@ where
     fn remove(&mut self, eid: &EdgeIdType);
 }
 
+
+
+
+
+
+
+
+
+
 #[derive(Clone)]
 pub struct UndirectedSimpleLocale<EdgeIdType>
 where
-    EdgeIdType: Id,
+EdgeIdType: Id,
 {
     pub undirected_edges: HashSet<EdgeIdType>,
 }
 
+
+
 impl<EdgeIdType> Locale<EdgeIdType> for UndirectedSimpleLocale<EdgeIdType>
 where
-    EdgeIdType: Id,
+EdgeIdType: Id,
 {
     const IS_DIRECTED: bool = false;
 
@@ -39,8 +63,24 @@ where
         self.undirected_edges.insert(eid);
     }
 
-    fn iter_all(&self) -> Box<dyn Iterator<Item = EdgeIdType> + '_> {
-        Box::new(self.undirected_edges.iter().copied())
+    #[inline(always)]
+    fn iter_all(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+        self.iter_undir()
+    }
+
+    #[inline(always)]
+    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+        Box::new(empty())
+    }
+
+    #[inline(always)]
+    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+        Box::new(empty())
+    }
+
+    #[inline(always)]
+    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+        Box::new(self.undirected_edges.iter().copied().map(|adj_eid| (adj_eid, AbsoluteEdgeDirection::Undirected)))
     }
 
     #[inline(always)]

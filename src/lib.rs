@@ -2,7 +2,7 @@
 //!     <i><b>Fast Rust crate for graph manipulation with user-friendly interface</b></i>
 //! </p>
 //!
-//! ```no_run
+//! ```ignore
 //! cargo add connecto_rs
 //! ```
 //!
@@ -14,7 +14,7 @@
 //! state.
 //!
 //! ## 🔍 Basic example
-//! ```no_run
+//! ```ignore
 //! /* In this example, we'll compute the shortest path from A to D in the following directed
 //!  * graph:
 //!  *
@@ -28,7 +28,7 @@
 //!  *
 //!  * The expected output is 8.
 //!  */
-//! use connecto_rs::basics::*;
+//! use connecto_rs::essentials::*;
 //!
 //! fn main() {
 //!     // g is our graph.
@@ -64,21 +64,39 @@
 //! ```
 //!
 //! ## 📚 Learn CONNECTO.RS quickly, step by step
-//! 1. [Create graphs of different classes using the `graph!` macro.][graphmacro]
-//! 2. [Access the sets of vertices and edges of your graph using `g.v()`, `g.v_mut()`, `g.e()` or
-//! `g.e_mut()`.][ve]
-//! 3. todo!
-//! 4. [Load and save your graphs.][io]
+//! 1. [Get acquainted with `Graph`, the main struct of CONNECTO.RS.][graph]
+//! 2. [Specify a graph type using the `graph!` macro.][graphmacro]
+//! 3. [Explore different kinds of operations that CONNECTO.RS enable you to do on your graphs out of the box.][util]
+//! 4. todo!
+//! 5. [Load and save your graphs.][io]
 //!
+//! [graph]: Graph
 //! [graphmacro]: graph
+//! [util]: crate::ops
 //! [io]: todo!
-//! [ve]: Graph
-mod locales;
+pub mod locales;
+pub mod essentials;
+pub mod iter;
+
+/// # Operations with your graphs
+///
+/// CONNECTO.RS implements a wide range of functions to edit, query or analyse your graphs as well
+/// as solvers for various standard problems on them.
+/// All these functions are grouped into the following modules:
+/// * [`connecto_rs::optim`][opt] -- Functions that solve optimisation problems on graphs.
+/// * [`connecto_rs::stat`][stat] -- Functions that compute statistics on graphs.
+/// * [`connecto_rs::trans`][trans] -- Functions that perform transformations on graphs.
+///
+/// [opt]: crate::optim
+/// [stat]: crate::stat
+/// [trans]: crate::trans
+pub mod ops;
 
 use std::{collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData};
 use anyhow::{Ok, Result, anyhow};
 
-use crate::locales::{Locale, UndirectedSimpleLocale};
+use crate::{iter::{AdjacentVerticesIter, DFSPreorderIter}, locales::Locale};
+pub use crate::ops::*;
 
 
 
@@ -94,6 +112,50 @@ where
 Self: Copy + Clone + Debug + Default + Eq + Hash + PartialOrd,
 {
     fn increment(&self) -> Self;
+}
+
+
+
+macro_rules! impl_id_for_numeric_type {
+    ($num_type:ty) => {
+        impl Id for $num_type {
+            fn increment(&self) -> Self {
+                self + 1
+            }
+        }
+    };
+}
+impl_id_for_numeric_type!(i8);
+impl_id_for_numeric_type!(i16);
+impl_id_for_numeric_type!(i32);
+impl_id_for_numeric_type!(i64);
+impl_id_for_numeric_type!(i128);
+impl_id_for_numeric_type!(isize);
+impl_id_for_numeric_type!(u8);
+impl_id_for_numeric_type!(u16);
+impl_id_for_numeric_type!(u32);
+impl_id_for_numeric_type!(u64);
+impl_id_for_numeric_type!(u128);
+impl_id_for_numeric_type!(usize);
+
+
+
+impl Id for char {
+    fn increment(&self) -> Self {
+        const UNICODE_SCALAR_VALUE_RANGE_1_LOWER: u32 = 0;
+        const UNICODE_SCALAR_VALUE_RANGE_1_UPPER: u32 = 0xD7FF;
+        const UNICODE_SCALAR_VALUE_RANGE_2_LOWER: u32 = 0xE000;
+        const UNICODE_SCALAR_VALUE_RANGE_2_UPPER: u32 = 0x10FFFF;
+        let curr_value = *self as u32; // guaranteed to be in one of the Unicode scalar value ranges
+        let new_value = curr_value + 1;
+        char::from_u32(if new_value == UNICODE_SCALAR_VALUE_RANGE_1_UPPER + 1 {
+            UNICODE_SCALAR_VALUE_RANGE_2_LOWER
+        } else if new_value == UNICODE_SCALAR_VALUE_RANGE_2_UPPER + 1 {
+            UNICODE_SCALAR_VALUE_RANGE_1_LOWER
+        } else {
+            new_value
+        }).unwrap()
+    }
 }
 
 
@@ -151,7 +213,6 @@ pub enum RelativeEdgeDirectionSelector {
 pub struct Edge<VertexIdType, EdgeWeightType>
 where
 VertexIdType: Id,
-EdgeWeightType: Clone,
 {
     vid1: VertexIdType,
     vid2: VertexIdType,
@@ -172,7 +233,6 @@ pub struct Vertex<EdgeIdType, LocaleType, VertexWeightType>
 where
 EdgeIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-VertexWeightType: Clone,
 {
     locale: LocaleType,
     weight: VertexWeightType,
@@ -194,8 +254,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     edges_dir: HashMap<EdgeIdType, Edge<VertexIdType, EdgeWeightType>>,
     edges_undir: HashMap<EdgeIdType, Edge<VertexIdType, EdgeWeightType>>,
@@ -211,8 +269,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     /// # Set of edges (immutable)
     ///
@@ -236,6 +292,14 @@ VertexWeightType: Clone,
     #[inline(always)]
     pub fn v(&'a self) -> ImmutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
         ImmutableVertexSet { g: self }
+    }
+
+    /// # Set of vertices (mutable)
+    ///
+    /// Allows to interact with the vertices of the graph in the _mutable_ mode.
+    #[inline(always)]
+    pub fn v_mut(&'a mut self) -> MutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
+        MutableVertexSet { g: self }
     }
 
     /// # Create a new graph
@@ -265,11 +329,7 @@ VertexWeightType: Clone,
 
 /// # Macro to specify a graph
 ///
-/// Graphs provided by CONNECTO.RS are _generic_ and must be specified at the moment of graph
-/// instantiation.
-/// With the help of this macro, users explicitly set specific values for four generic type
-/// parameters of [`Graph`], namely:
-/// Graphs in CONNECTO.RS are _generic_ and must be specified when the graph is instantiated.
+/// Graphs in CONNECTO.RS are _generic_ and must be specified when a graph is instantiated.
 /// This macro enables users to set specific values for the four generic type parameters of
 /// [`Graph`], namely:
 /// * `EdgeIdType` -- this type is used to uniquely identify the edges of a graph.
@@ -284,19 +344,19 @@ VertexWeightType: Clone,
 /// category of the graph and is encoded graphically to make your code shorter and easier to read.
 /// Specifically, use the following patterns for this macro for each category:
 /// * Undirected simple graph
-/// ```no_run
+/// ```ignore
 /// graph!{ [VertexIdType|VertexWeightType] ---[EdgeIdType|EdgeWeightType]--- }
 /// ```
 /// * Directed simple graph
-/// ```no_run
+/// ```ignore
 /// graph!{ [VertexIdType|VertexWeightType] ---[EdgeIdType|EdgeWeightType]--> }
 /// ```
 /// * Undirected multi-graph
-/// ```no_run
+/// ```ignore
 /// graph!{ [VertexIdType|VertexWeightType] ===[EdgeIdType|EdgeWeightType]=== }
 /// ```
 /// * Directed multi-graph
-/// ```no_run
+/// ```ignore
 /// graph!{ [VertexIdType|VertexWeightType] ===[EdgeIdType|EdgeWeightType]==> }
 /// ```
 ///
@@ -311,7 +371,7 @@ VertexWeightType: Clone,
 #[macro_export]
 macro_rules! graph {
     ([$vertex_id_type:ty|$vertex_weight_type:ty] ---[$edge_id_type:ty|$edge_weight_type:ty]---) => {
-        Graph<$edge_id_type, $vertex_id_type, UndirectedSimpleLocate<$edge_id_type>, $edge_weight_type, $vertex_weight_type>
+        Graph<$edge_id_type, $vertex_id_type, UndirectedSimpleLocale<$edge_id_type>, $edge_weight_type, $vertex_weight_type>
     };
 }
 
@@ -329,8 +389,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     g: &'a Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
 }
@@ -342,8 +400,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     /// # Check if an edge exists
     ///
@@ -429,8 +485,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     g: &'a mut Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
 }
@@ -442,8 +496,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     /// # Insert a new edge
     ///
@@ -555,8 +607,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     g: &'a Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
 }
@@ -568,8 +618,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     /// # Check if a vertex exists
     ///
@@ -587,6 +635,15 @@ VertexWeightType: Clone,
         self.g.vertices.len()
     }
 
+    /// # Get vertex weight
+    ///
+    /// Returns `Some(&vweight)`, where `vweight` is the weight of the vertex with ID `vid`.
+    /// Returns `None` if vertex `vid` doesn't exist.
+    #[inline(always)]
+    pub fn get(&self, vid: VertexIdType) -> Option<&'a VertexWeightType> {
+        Some(&self.g.vertices.get(&vid)?.weight)
+    }
+
     /// # Iterate over vertices
     ///
     /// Returns an iterator over all vertices in the graph.
@@ -596,18 +653,86 @@ VertexWeightType: Clone,
     /// > **⚠ Lack-of-guarantee warning**
     /// >
     /// > This function does **not** guarantee any specific order of vertices.
-    /// > If an order is required, consider using functions from [`connecto_rs::vertex_order`]
-    /// > module.
     ///
     /// > **⚠ Repeatability warning**
     /// >
     /// > This function is **not** repeatable, i.e. if you run your program on the same machine
-    /// > multiple times, corresponding calls to this function may produce different results.
-    /// > If repeatability is required, consider using functions from [`connecto_rs::vertex_order`]
-    /// > module.
+    /// > multiple times, corresponding calls to this function may return iterators that produce
+    /// > different sequences of vertices.
     #[inline(always)]
     pub fn iter(&self) -> Box<dyn Iterator<Item = (VertexIdType, &'a VertexWeightType)> + 'a> {
         Box::new(self.g.vertices.iter().map(|(vid, v)| (*vid, &v.weight)))
+    }
+
+    /// # Iterate over vertices adjacent to the given vertex
+    ///
+    /// Constructs an iterator over all vertices adjacent to the vertex with ID `vid`.
+    /// Depending on the value of `reldirsel`, the iterator will iterate over all vertices `adjvid`
+    /// that are connected with `vid` via at least one edge of the specified relative direction:
+    /// * `reldirsel == RelativeEdgeDirectionSelector::Any` -- iterator will iterate over all
+    /// vertices that are connected with `vid` via any edge.
+    /// * `reldirsel == RelativeEdgeDirectionSelector::AnyDirected` -- iterator will iterate over
+    /// all vertices that are connected with `vid` via at least one directed edge,
+    /// whether this edge is directed from `vid` to `adjvid` or from `adjvid` to `vid`.
+    /// * `reldirsel == RelativeEdgeDirectionSelector::DirectedFrom` -- iterator will iterate over
+    /// all vertices that are connected with `vid` via at least one edge directed from
+    /// `vid` to `adjvid`.
+    /// * `reldirsel == RelativeEdgeDirectionSelector::DirectedTo` -- iterator will iterate over
+    /// all vertices that are connected with `vid` via at least one edge directed from
+    /// `adjvid` to `vid`.
+    /// * `reldirsel == RelativeEdgeDirectionSelector::Undirected` -- iterator will iterate over
+    /// all vertices that are connected with `vid` via at least one undirected edge.
+    ///
+    /// Returns `Ok(it)`, if successful.
+    /// Here, `it` is an iterator that produces items `(adjvid, &adjvweight)`, where `adjvid` is
+    /// the ID of an adjacent vertex and `adjvweight` is its weight.
+    /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid` doesn't exist.
+    ///
+    /// > **⚠ Lack-of-guarantee warning**
+    /// >
+    /// > This function does **not** guarantee any specific order of vertices.
+    ///
+    /// > **⚠ Repeatability warning**
+    /// >
+    /// > This function is **not** repeatable, i.e. if you run your program on the same machine
+    /// > multiple times, corresponding calls to this function may return iterators that produce
+    /// > different sequences of vertices.
+    pub fn iter_adjacent(&self, vid: VertexIdType, reldirsel: RelativeEdgeDirectionSelector) -> Result<AdjacentVerticesIter<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>> {
+        AdjacentVerticesIter::new(self.g, vid, reldirsel)
+    }
+
+    /// # Iterate over vertices in a DFS preorder
+    ///
+    /// Constructs an iterator over vertices reachable from the vertex with ID `vid` via a
+    /// depth-first search.
+    /// The iterator will visit the vertices in the DFS preorder.
+    /// This is useful for systematic graph traversals.
+    /// For example, for the following graph:
+    /// ```ignore
+    ///     A    B    C
+    ///      ●---●-->●
+    ///      |       ↑
+    ///    D ●-------● E
+    ///      |       |
+    ///      ●<------●
+    ///     F         G
+    /// ```
+    /// a possible DFS preorder of vertices with `vid = 'A'` is `A`, `D`, `F`, `E`, `C`, `G`, `B`.
+    /// On the other hand, with `vid = 'C'`, the only possible DFS preorder is `C` because all
+    /// other vertices are not reachable from `C` via a DFS.
+    ///
+    /// Returns `Ok(it)`, if successful.
+    /// Here, `it` is an iterator that produces items `(vid, &vweight)`, where `vid` is the ID of a
+    /// vertex and `vweight` is its weight.
+    /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid` doesn't exist.
+    ///
+    /// > **⚠ Repeatability warning**
+    /// >
+    /// > This function is **not** repeatable, i.e. if you run your program on the same machine
+    /// > multiple times, corresponding calls to this function may return iterators that produce
+    /// > different sequences of vertices.
+    pub fn iter_in_dfs_preorder(&self, vid: VertexIdType) -> Result<DFSPreorderIter<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>> {
+        DFSPreorderIter::new(self.g, vid)
     }
 }
 
@@ -625,8 +750,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     g: &'a mut Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
 }
@@ -638,8 +761,6 @@ where
 EdgeIdType: Id,
 VertexIdType: Id,
 LocaleType: Locale<EdgeIdType>,
-EdgeWeightType: Clone,
-VertexWeightType: Clone,
 {
     /// # Insert a new vertex
     ///
@@ -669,7 +790,7 @@ VertexWeightType: Clone,
 
     /// # Remove an existing vertex
     ///
-    /// Deletes the vertex with ID `vid` from the graph and all edges incident on it.
+    /// Deletes the vertex with ID `vid` from the graph and all the edges incident on it.
     /// Returns `Some(vweight, es)` if the vertex existed in the graph, where `vweight` is the
     /// weight of the deleted vertex, `es` is the vector of tuples `(vid1, vid2, dir, eweight)`
     /// describing the deleted incident edges
@@ -680,7 +801,7 @@ VertexWeightType: Clone,
             return None;
         }
         let mut es = Vec::with_capacity(self.g.vertices[&vid].locale.count_all());
-        for eid in self.g.vertices[&vid].locale.iter_all().collect::<Vec<_>>() {
+        for (eid, _) in self.g.vertices[&vid].locale.iter_all().collect::<Vec<_>>() {
             es.push(self.g.e_mut().remove(eid).unwrap());
         }
         Some((self.g.vertices.remove(&vid).unwrap().weight, es))
