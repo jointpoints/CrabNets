@@ -11,24 +11,24 @@ use std::{collections::HashSet, iter::empty};
 
 
 
-pub trait Locale<EdgeIdType>
+pub trait Locale<EId>
 where
 Self: Clone,
-EdgeIdType: Id,
+EId: Id,
 {
     const IS_DIRECTED: bool;
     const IS_SIMPLE: bool;
-    fn insert(&mut self, eid: EdgeIdType, reldir: RelativeEdgeDirection);
-    fn iter_all(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
-    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
-    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
-    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_>;
+    fn insert(&mut self, eid: EId, reldir: RelativeEdgeDirection);
+    fn iter_all(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_>;
+    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_>;
+    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_>;
+    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_>;
     fn count_all(&self) -> usize;
     fn count_dir_from(&self) -> usize;
     fn count_dir_to(&self) -> usize;
     fn count_undir(&self) -> usize;
     fn new() -> Self;
-    fn remove(&mut self, eid: &EdgeIdType);
+    fn remove(&mut self, eid: &EId);
 }
 
 
@@ -41,45 +41,45 @@ EdgeIdType: Id,
 
 
 #[derive(Clone)]
-pub struct UndirectedSimpleLocale<EdgeIdType>
+pub struct UndirectedSimpleLocale<EId>
 where
-EdgeIdType: Id,
+EId: Id,
 {
-    pub undirected_edges: HashSet<EdgeIdType>,
+    pub undirected_edges: HashSet<EId>,
 }
 
 
 
-impl<EdgeIdType> Locale<EdgeIdType> for UndirectedSimpleLocale<EdgeIdType>
+impl<EId> Locale<EId> for UndirectedSimpleLocale<EId>
 where
-EdgeIdType: Id,
+EId: Id,
 {
     const IS_DIRECTED: bool = false;
 
     const IS_SIMPLE: bool = true;
 
     #[inline(always)]
-    fn insert(&mut self, eid: EdgeIdType, _reldir: RelativeEdgeDirection) {
+    fn insert(&mut self, eid: EId, _reldir: RelativeEdgeDirection) {
         self.undirected_edges.insert(eid);
     }
 
     #[inline(always)]
-    fn iter_all(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+    fn iter_all(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_> {
         self.iter_undir()
     }
 
     #[inline(always)]
-    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+    fn iter_dir_from(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_> {
         Box::new(empty())
     }
 
     #[inline(always)]
-    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+    fn iter_dir_to(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_> {
         Box::new(empty())
     }
 
     #[inline(always)]
-    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EdgeIdType, AbsoluteEdgeDirection)> + '_> {
+    fn iter_undir(&self) -> Box<dyn Iterator<Item = (EId, AbsoluteEdgeDirection)> + '_> {
         Box::new(self.undirected_edges.iter().copied().map(|adj_eid| (adj_eid, AbsoluteEdgeDirection::Undirected)))
     }
 
@@ -111,7 +111,7 @@ EdgeIdType: Id,
     }
 
     #[inline(always)]
-    fn remove(&mut self, eid: &EdgeIdType) {
+    fn remove(&mut self, eid: &EId) {
         self.undirected_edges.remove(eid);
     }
 }

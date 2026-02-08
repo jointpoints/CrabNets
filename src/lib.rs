@@ -95,7 +95,7 @@ pub mod ops;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData};
 use anyhow::{Ok, Result, anyhow};
 
-use crate::{iter::{AdjacentVerticesIter, DFSPreorderIter}, locales::Locale};
+use crate::{iter::{AdjacentVerticesIter, DFSPostorderIter, DFSPreorderIter}, locales::Locale};
 pub use crate::ops::*;
 
 
@@ -210,13 +210,13 @@ pub enum RelativeEdgeDirectionSelector {
 
 
 #[derive(Clone)]
-pub struct Edge<VertexIdType, EdgeWeightType>
+pub struct Edge<VId, EWgt>
 where
-VertexIdType: Id,
+VId: Id,
 {
-    vid1: VertexIdType,
-    vid2: VertexIdType,
-    weight: EdgeWeightType,
+    vid1: VId,
+    vid2: VId,
+    weight: EWgt,
 }
 
 
@@ -229,14 +229,14 @@ VertexIdType: Id,
 
 
 #[derive(Clone)]
-pub struct Vertex<EdgeIdType, LocaleType, VertexWeightType>
+pub struct Vertex<EId, L, VWgt>
 where
-EdgeIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+L: Locale<EId>,
 {
-    locale: LocaleType,
-    weight: VertexWeightType,
-    _phantom: PhantomData<EdgeIdType>,
+    locale: L,
+    weight: VWgt,
+    _phantom: PhantomData<EId>,
 }
 
 
@@ -249,32 +249,32 @@ LocaleType: Locale<EdgeIdType>,
 
 
 #[derive(Clone)]
-pub struct Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+pub struct Graph<EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
-    edges_dir: HashMap<EdgeIdType, Edge<VertexIdType, EdgeWeightType>>,
-    edges_undir: HashMap<EdgeIdType, Edge<VertexIdType, EdgeWeightType>>,
-    vertices: HashMap<VertexIdType, Vertex<EdgeIdType, LocaleType, VertexWeightType>>,
-    next_free_edge_id: EdgeIdType,
-    next_free_vertex_id: VertexIdType,
+    edges_dir: HashMap<EId, Edge<VId, EWgt>>,
+    edges_undir: HashMap<EId, Edge<VId, EWgt>>,
+    vertices: HashMap<VId, Vertex<EId, L, VWgt>>,
+    next_free_edge_id: EId,
+    next_free_vertex_id: VId,
 }
 
 
 
-impl<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+impl<'a, EId, VId, L, EWgt, VWgt> Graph<EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
     /// # Set of edges (immutable)
     ///
     /// Allows to interact with the edges of the graph in the _immutable_ mode.
     #[inline(always)]
-    pub fn e(&'a self) -> ImmutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
+    pub fn e(&'a self) -> ImmutableEdgeSet<'a, EId, VId, L, EWgt, VWgt> {
         ImmutableEdgeSet { g: self }
     }
 
@@ -282,7 +282,7 @@ LocaleType: Locale<EdgeIdType>,
     ///
     /// Allows to interact with the edges of the graph in the _mutable_ mode.
     #[inline(always)]
-    pub fn e_mut(&'a mut self) -> MutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
+    pub fn e_mut(&'a mut self) -> MutableEdgeSet<'a, EId, VId, L, EWgt, VWgt> {
         MutableEdgeSet { g: self }
     }
 
@@ -290,7 +290,7 @@ LocaleType: Locale<EdgeIdType>,
     ///
     /// Allows to interact with the vertices of the graph in the _immutable_ mode.
     #[inline(always)]
-    pub fn v(&'a self) -> ImmutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
+    pub fn v(&'a self) -> ImmutableVertexSet<'a, EId, VId, L, EWgt, VWgt> {
         ImmutableVertexSet { g: self }
     }
 
@@ -298,7 +298,7 @@ LocaleType: Locale<EdgeIdType>,
     ///
     /// Allows to interact with the vertices of the graph in the _mutable_ mode.
     #[inline(always)]
-    pub fn v_mut(&'a mut self) -> MutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> {
+    pub fn v_mut(&'a mut self) -> MutableVertexSet<'a, EId, VId, L, EWgt, VWgt> {
         MutableVertexSet { g: self }
     }
 
@@ -319,8 +319,8 @@ LocaleType: Locale<EdgeIdType>,
             edges_dir: HashMap::new(),
             edges_undir: HashMap::new(),
             vertices: HashMap::new(),
-            next_free_edge_id: EdgeIdType::default(),
-            next_free_vertex_id: VertexIdType::default()
+            next_free_edge_id: EId::default(),
+            next_free_vertex_id: VId::default()
         }
     }
 }
@@ -332,32 +332,32 @@ LocaleType: Locale<EdgeIdType>,
 /// Graphs in CONNECTO.RS are _generic_ and must be specified when a graph is instantiated.
 /// This macro enables users to set specific values for the four generic type parameters of
 /// [`Graph`], namely:
-/// * `EdgeIdType` -- this type is used to uniquely identify the edges of a graph.
-/// * `EdgeWeightType` -- this type is used as a weight of each edge. This is not necessarily a
+/// * `EId` -- this type is used to uniquely identify the edges of a graph.
+/// * `EWgt` -- this type is used as a weight of each edge. This is not necessarily a
 /// number or even a primitive type: it can a struct, an enum, and many other things.
-/// * `VertexIdType` -- this type is used to uniquely identify the vertices of a graph.
-/// * `VertexWeightType` -- this type is used as a weight of each vertex. Just as `EdgeWeightType`,
+/// * `VId` -- this type is used to uniquely identify the vertices of a graph.
+/// * `VWgt` -- this type is used as a weight of each vertex. Just as `EWgt`,
 /// this is not necessarily a number or even a primitive type: it can a struct, an enum, and many
 /// other things.
 ///
-/// The remaining generic type parameter of [`Graph`], `LocaleType`, is used to determine the
+/// The remaining generic type parameter of [`Graph`], `L`, is used to determine the
 /// category of the graph and is encoded graphically to make your code shorter and easier to read.
 /// Specifically, use the following patterns for this macro for each category:
 /// * Undirected simple graph
 /// ```ignore
-/// graph!{ [VertexIdType|VertexWeightType] ---[EdgeIdType|EdgeWeightType]--- }
+/// graph!{ [VId|VWgt] ---[EId|EWgt]--- }
 /// ```
 /// * Directed simple graph
 /// ```ignore
-/// graph!{ [VertexIdType|VertexWeightType] ---[EdgeIdType|EdgeWeightType]--> }
+/// graph!{ [VId|VWgt] ---[EId|EWgt]--> }
 /// ```
 /// * Undirected multi-graph
 /// ```ignore
-/// graph!{ [VertexIdType|VertexWeightType] ===[EdgeIdType|EdgeWeightType]=== }
+/// graph!{ [VId|VWgt] ===[EId|EWgt]=== }
 /// ```
 /// * Directed multi-graph
 /// ```ignore
-/// graph!{ [VertexIdType|VertexWeightType] ===[EdgeIdType|EdgeWeightType]==> }
+/// graph!{ [VId|VWgt] ===[EId|EWgt]==> }
 /// ```
 ///
 /// With this macro, we aimed to create a clear and easily interpretable visual representation of a
@@ -371,7 +371,13 @@ LocaleType: Locale<EdgeIdType>,
 #[macro_export]
 macro_rules! graph {
     ([$vertex_id_type:ty|$vertex_weight_type:ty] ---[$edge_id_type:ty|$edge_weight_type:ty]---) => {
-        Graph<$edge_id_type, $vertex_id_type, UndirectedSimpleLocale<$edge_id_type>, $edge_weight_type, $vertex_weight_type>
+        Graph<
+            $edge_id_type,
+            $vertex_id_type,
+            UndirectedSimpleLocale<$edge_id_type>,
+            $edge_weight_type,
+            $vertex_weight_type
+        >
     };
 }
 
@@ -384,28 +390,28 @@ macro_rules! graph {
 
 
 
-pub struct ImmutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+pub struct ImmutableEdgeSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
-    g: &'a Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
+    g: &'a Graph<EId, VId, L, EWgt, VWgt>,
 }
 
 
 
-impl<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> ImmutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+impl<'a, EId, VId, L, EWgt, VWgt> ImmutableEdgeSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
     /// # Check if an edge exists
     ///
     /// Checks whether the edge with ID `eid` exists in the graph.
     #[inline(always)]
-    pub fn contains(&self, eid: EdgeIdType) -> bool {
+    pub fn contains(&self, eid: EId) -> bool {
         self.g.edges_dir.contains_key(&eid) || self.g.edges_undir.contains_key(&eid)
     }
 
@@ -427,12 +433,24 @@ LocaleType: Locale<EdgeIdType>,
     /// See [`RelativeEdgeDirectionSelector`] for the description of `reldirsel`.
     /// Returns `Ok(num)` if successful, where `num` is the requested number of edges.
     /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid1` or `vid2` doesn't exist.
-    pub fn count_between(&self, vid1: VertexIdType, vid2: VertexIdType, reldirsel: RelativeEdgeDirectionSelector) -> Result<usize> {
+    pub fn count_between(&self, vid1: VId, vid2: VId, reldirsel: RelativeEdgeDirectionSelector) -> Result<usize> {
         if !self.g.vertices.contains_key(&vid1) {
-            return Err(anyhow!("The number of edges between the vertices with IDs {:?} and {:?} can't be counted because the vertex with ID {:?} doesn't exist.", vid1, vid2, vid1));
+            return Err(anyhow!(
+                "The number of edges between the vertices with IDs {:?} and {:?} can't be counted because the vertex \
+                with ID {:?} doesn't exist.",
+                vid1,
+                vid2,
+                vid1
+            ));
         }
         if !self.g.vertices.contains_key(&vid2) {
-            return Err(anyhow!("The number of edges between the vertices with IDs {:?} and {:?} can't be counted because the vertex with ID {:?} doesn't exist.", vid1, vid2, vid2));
+            return Err(anyhow!(
+                "The number of edges between the vertices with IDs {:?} and {:?} can't be counted because the vertex \
+                with ID {:?} doesn't exist.",
+                vid1,
+                vid2,
+                vid2
+            ));
         }
         let mut num;
         match reldirsel {
@@ -480,22 +498,22 @@ LocaleType: Locale<EdgeIdType>,
 
 
 
-pub struct MutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+pub struct MutableEdgeSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
-    g: &'a mut Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
+    g: &'a mut Graph<EId, VId, L, EWgt, VWgt>,
 }
 
 
 
-impl<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> MutableEdgeSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+impl<'a, EId, VId, L, EWgt, VWgt> MutableEdgeSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
     /// # Insert a new edge
     ///
@@ -517,26 +535,53 @@ LocaleType: Locale<EdgeIdType>,
     /// * _Parallel edge in a simple graph (2)._ The graph is directed **and** the graph is simple
     /// **and** there's already an edge between `vid1` to `vid2` of the same orientation as the new
     /// edge.
-    pub fn insert(&mut self, eid_option: Option<EdgeIdType>, vid1: VertexIdType, vid2: VertexIdType, dir: AbsoluteEdgeDirection, eweight: EdgeWeightType) -> Result<EdgeIdType> {
+    pub fn insert(
+        &mut self,
+        eid_option: Option<EId>,
+        vid1: VId,
+        vid2: VId,
+        dir: AbsoluteEdgeDirection,
+        eweight: EWgt
+    ) -> Result<EId> {
         if let Some(eid) = eid_option && (self.g.edges_dir.contains_key(&eid) || self.g.edges_undir.contains_key(&eid)) {
-            return Err(anyhow!("The edge with ID {:?} can't be added because the edge with this ID already exists in the graph.", eid));
+            return Err(anyhow!(
+                "The edge with ID {:?} can't be added because the edge with this ID already exists in the graph.",
+                eid
+            ));
         }
         if !self.g.vertices.contains_key(&vid1) {
-            return Err(anyhow!("A new edge between the vertices with IDs {:?} and {:?} can't be added because the vertex with ID {:?} doesn't exist.", vid1, vid2, vid1));
+            return Err(anyhow!(
+                "A new edge between the vertices with IDs {:?} and {:?} can't be added because the vertex with ID \
+                {:?} doesn't exist.",
+                vid1,
+                vid2,
+                vid1
+            ));
         }
         if !self.g.vertices.contains_key(&vid2) {
-            return Err(anyhow!("A new edge between the vertices with IDs {:?} and {:?} can't be added because the vertex with ID {:?} doesn't exist.", vid1, vid2, vid2));
+            return Err(anyhow!(
+                "A new edge between the vertices with IDs {:?} and {:?} can't be added because the vertex with ID \
+                {:?} doesn't exist.",
+                vid1,
+                vid2,
+                vid2
+            ));
         }
         let assertion_reldirsel = match dir {
-            AbsoluteEdgeDirection::Directed => if LocaleType::IS_DIRECTED {
+            AbsoluteEdgeDirection::Directed => if L::IS_DIRECTED {
                 RelativeEdgeDirectionSelector::DirectedFrom
             } else {
                 RelativeEdgeDirectionSelector::Undirected
             },
             AbsoluteEdgeDirection::Undirected => RelativeEdgeDirectionSelector::Undirected,
         };
-        if LocaleType::IS_SIMPLE && self.g.e().count_between(vid1, vid2, assertion_reldirsel).unwrap() > 0 {
-            return Err(anyhow!("A new edge between the vertices with IDs {:?} and {:?} can't be added because an edge between them going in the same direction already exists and the graph is simple.", vid1, vid2));
+        if L::IS_SIMPLE && self.g.e().count_between(vid1, vid2, assertion_reldirsel).unwrap() > 0 {
+            return Err(anyhow!(
+                "A new edge between the vertices with IDs {:?} and {:?} can't be added because an edge between them \
+                going in the same direction already exists and the graph is simple.",
+                vid1,
+                vid2
+            ));
         }
         let eid = match eid_option {
             Some(value) => value,
@@ -578,7 +623,7 @@ LocaleType: Locale<EdgeIdType>,
     /// If `dir == AbsoluteEdgeDirection::Directed`, then the edge was directed from `vid1` to
     /// `vid2`.
     /// Returns `None` otherwise.
-    pub fn remove(&mut self, eid: EdgeIdType) -> Option<(VertexIdType, VertexIdType, AbsoluteEdgeDirection, EdgeWeightType)> {
+    pub fn remove(&mut self, eid: EId) -> Option<(VId, VId, AbsoluteEdgeDirection, EWgt)> {
         let (removed_edge, dir) = if self.g.edges_dir.get(&eid).is_some() {
             (self.g.edges_dir.remove(&eid).unwrap(), AbsoluteEdgeDirection::Directed)
         } else if self.g.edges_undir.get(&eid).is_some() {
@@ -602,28 +647,28 @@ LocaleType: Locale<EdgeIdType>,
 
 
 
-pub struct ImmutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+pub struct ImmutableVertexSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
-    g: &'a Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
+    g: &'a Graph<EId, VId, L, EWgt, VWgt>,
 }
 
 
 
-impl<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> ImmutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+impl<'a, EId, VId, L, EWgt, VWgt> ImmutableVertexSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
     /// # Check if a vertex exists
     ///
     /// Checks whether the vertex with ID `vid` exists in the graph.
     #[inline(always)]
-    pub fn contains(&self, vid: VertexIdType) -> bool {
+    pub fn contains(&self, vid: VId) -> bool {
         self.g.vertices.contains_key(&vid)
     }
 
@@ -640,7 +685,7 @@ LocaleType: Locale<EdgeIdType>,
     /// Returns `Some(&vweight)`, where `vweight` is the weight of the vertex with ID `vid`.
     /// Returns `None` if vertex `vid` doesn't exist.
     #[inline(always)]
-    pub fn get(&self, vid: VertexIdType) -> Option<&'a VertexWeightType> {
+    pub fn get(&self, vid: VId) -> Option<&'a VWgt> {
         Some(&self.g.vertices.get(&vid)?.weight)
     }
 
@@ -660,7 +705,7 @@ LocaleType: Locale<EdgeIdType>,
     /// > multiple times, corresponding calls to this function may return iterators that produce
     /// > different sequences of vertices.
     #[inline(always)]
-    pub fn iter(&self) -> Box<dyn Iterator<Item = (VertexIdType, &'a VertexWeightType)> + 'a> {
+    pub fn iter(&self) -> Box<dyn Iterator<Item = (VId, &'a VWgt)> + 'a> {
         Box::new(self.g.vertices.iter().map(|(vid, v)| (*vid, &v.weight)))
     }
 
@@ -684,8 +729,8 @@ LocaleType: Locale<EdgeIdType>,
     /// all vertices that are connected with `vid` via at least one undirected edge.
     ///
     /// Returns `Ok(it)`, if successful.
-    /// Here, `it` is an iterator that produces items `(adjvid, &adjvweight)`, where `adjvid` is
-    /// the ID of an adjacent vertex and `adjvweight` is its weight.
+    /// Here, `it` is an iterator that produces items `adjvid`, where `adjvid` is the ID of an
+    /// adjacent vertex.
     /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid` doesn't exist.
     ///
     /// > **⚠ Lack-of-guarantee warning**
@@ -697,8 +742,46 @@ LocaleType: Locale<EdgeIdType>,
     /// > This function is **not** repeatable, i.e. if you run your program on the same machine
     /// > multiple times, corresponding calls to this function may return iterators that produce
     /// > different sequences of vertices.
-    pub fn iter_adjacent(&self, vid: VertexIdType, reldirsel: RelativeEdgeDirectionSelector) -> Result<AdjacentVerticesIter<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>> {
+    pub fn iter_adjacent(
+        &self,
+        vid: VId,
+        reldirsel: RelativeEdgeDirectionSelector
+    ) -> Result<AdjacentVerticesIter<'a, EId, VId, L, EWgt, VWgt>> {
         AdjacentVerticesIter::new(self.g, vid, reldirsel)
+    }
+
+    /// # Iterate over vertices in a DFS postorder
+    ///
+    /// Constructs an iterator over vertices reachable from the vertex with ID `vid` via a
+    /// depth-first search.
+    /// The iterator will visit the vertices in the DFS postorder.
+    /// This is useful for systematic graph traversals.
+    /// For example, for the following graph:
+    /// ```ignore
+    ///     A    B    C
+    ///      ●---●-->●
+    ///      |       ↑
+    ///    D ●-------● E
+    ///      |       |
+    ///      ●<------●
+    ///     F         G
+    /// ```
+    /// a possible DFS postorder of vertices with `vid = 'A'` is `F`, `C`, `G`, `E`, `D`, `B`,
+    /// `A`.
+    /// On the other hand, with `vid = 'C'`, the only possible DFS postorder is `C` because all
+    /// other vertices are not reachable from `C` via a DFS.
+    ///
+    /// Returns `Ok(it)`, if successful.
+    /// Here, `it` is an iterator that produces items `vid`, where `vid` is the ID of a vertex.
+    /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid` doesn't exist.
+    ///
+    /// > **⚠ Repeatability warning**
+    /// >
+    /// > This function is **not** repeatable, i.e. if you run your program on the same machine
+    /// > multiple times, corresponding calls to this function may return iterators that produce
+    /// > different sequences of vertices.
+    pub fn iter_in_dfs_postorder(&self, vid: VId) -> Result<DFSPostorderIter<'a, EId, VId, L, EWgt, VWgt>> {
+        DFSPostorderIter::new(self.g, vid)
     }
 
     /// # Iterate over vertices in a DFS preorder
@@ -722,8 +805,7 @@ LocaleType: Locale<EdgeIdType>,
     /// other vertices are not reachable from `C` via a DFS.
     ///
     /// Returns `Ok(it)`, if successful.
-    /// Here, `it` is an iterator that produces items `(vid, &vweight)`, where `vid` is the ID of a
-    /// vertex and `vweight` is its weight.
+    /// Here, `it` is an iterator that produces items `vid`, where `vid` is the ID of a vertex.
     /// Returns `Err(anyhow::Error(...))` if the vertex with ID `vid` doesn't exist.
     ///
     /// > **⚠ Repeatability warning**
@@ -731,7 +813,7 @@ LocaleType: Locale<EdgeIdType>,
     /// > This function is **not** repeatable, i.e. if you run your program on the same machine
     /// > multiple times, corresponding calls to this function may return iterators that produce
     /// > different sequences of vertices.
-    pub fn iter_in_dfs_preorder(&self, vid: VertexIdType) -> Result<DFSPreorderIter<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>> {
+    pub fn iter_in_dfs_preorder(&self, vid: VId) -> Result<DFSPreorderIter<'a, EId, VId, L, EWgt, VWgt>> {
         DFSPreorderIter::new(self.g, vid)
     }
 }
@@ -745,22 +827,22 @@ LocaleType: Locale<EdgeIdType>,
 
 
 
-pub struct MutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+pub struct MutableVertexSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
-    g: &'a mut Graph<EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>,
+    g: &'a mut Graph<EId, VId, L, EWgt, VWgt>,
 }
 
 
 
-impl<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType> MutableVertexSet<'a, EdgeIdType, VertexIdType, LocaleType, EdgeWeightType, VertexWeightType>
+impl<'a, EId, VId, L, EWgt, VWgt> MutableVertexSet<'a, EId, VId, L, EWgt, VWgt>
 where
-EdgeIdType: Id,
-VertexIdType: Id,
-LocaleType: Locale<EdgeIdType>,
+EId: Id,
+VId: Id,
+L: Locale<EId>,
 {
     /// # Insert a new vertex
     ///
@@ -769,9 +851,12 @@ LocaleType: Locale<EdgeIdType>,
     /// If `vid_option == None`, the ID of the new vertex will be selected automatically.
     /// Returns `Ok(vid)` if successful, where `vid` is the ID of the new vertex.
     /// Returns `Err(anyhow::Err(...))` if the vertex with ID `vid` already exists.
-    pub fn insert(&mut self, vid_option: Option<VertexIdType>, vweight: VertexWeightType) -> Result<VertexIdType> {
+    pub fn insert(&mut self, vid_option: Option<VId>, vweight: VWgt) -> Result<VId> {
         if let Some(vid) = vid_option && self.g.vertices.contains_key(&vid) {
-            return Err(anyhow!("The vertex with ID {:?} can't be added because the vertex with this ID already exists in the graph.", vid));
+            return Err(anyhow!(
+                "The vertex with ID {:?} can't be added because the vertex with this ID already exists in the graph.",
+                vid
+            ));
         }
         let vid = match vid_option {
             Some(value) => value,
@@ -796,7 +881,7 @@ LocaleType: Locale<EdgeIdType>,
     /// describing the deleted incident edges
     /// (see [MutableEdgeSet::remove] for the description of `vid1`, `vid2`, `dir` and `eweight`).
     /// Returns `None` otherwise.
-    pub fn remove(&mut self, vid: VertexIdType) -> Option<(VertexWeightType, Vec<(VertexIdType, VertexIdType, AbsoluteEdgeDirection, EdgeWeightType)>)> {
+    pub fn remove(&mut self, vid: VId) -> Option<(VWgt, Vec<(VId, VId, AbsoluteEdgeDirection, EWgt)>)> {
         if !self.g.vertices.contains_key(&vid) {
             return None;
         }
